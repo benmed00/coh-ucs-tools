@@ -46,6 +46,39 @@ DEFAULT_OLD_ENGLISH = Path(r"c:\Program Files (x86)\THQ\Company of Heroes\Engine
 DEFAULT_REFERENCE = Path("downloads/RelicCOH.English.NSV.ucs")
 
 _TOKEN_RE = re.compile(r"%\d[A-Za-z]*%")  # UCS format tokens like %1% / %1NAME%
+_PH_FMT = "⟦MT{idx}⟧"  # MT-safe placeholder; restored after translation
+
+
+def protect_tokens(text: str) -> tuple[str, list[str]]:
+    """Replace UCS format tokens with numbered placeholders before MT."""
+    tokens: list[str] = []
+
+    def repl(match: re.Match[str]) -> str:
+        tokens.append(match.group(0))
+        return _PH_FMT.format(idx=len(tokens) - 1)
+
+    return _TOKEN_RE.sub(repl, text), tokens
+
+
+def restore_tokens(text: str, tokens: list[str]) -> str:
+    """Put UCS format tokens back after MT."""
+    for idx, token in enumerate(tokens):
+        text = text.replace(_PH_FMT.format(idx=idx), token)
+    return text
+
+
+def translate_text(text: str, client: MtClient | None = None, *,
+                   source: str = "en", target: str = "ar") -> str:
+    """Translate ``text``, preserving UCS format tokens like ``%1%`` / ``%1NAME%``."""
+    if not text.strip():
+        return text
+    protected, tokens = protect_tokens(text)
+    if not protected.strip():
+        return text
+    if client is None:
+        client = MtClient(source=source, target=target)
+    translated = client.translate(protected)
+    return restore_tokens(translated, tokens)
 
 
 @dataclass(frozen=True)
@@ -133,22 +166,42 @@ def translate_missing(russian: dict[int, str], targets: list[int],
     return cache
 
 
-def _normalize(text: str) -> str:
+def _apply_glossary(text: str, glossary: Optional[dict[str, str]] = None) -> str:
+    """Normalize domain terms via glossary before similarity compare."""
+    if not glossary:
+        return text
+    out = text
+    for src, dst in sorted(glossary.items(), key=lambda kv: -len(kv[0])):
+        if src:
+            out = re.sub(re.escape(src), dst, out, flags=re.IGNORECASE)
+    return out
+
+
+def _normalize(text: str, glossary: Optional[dict[str, str]] = None) -> str:
     """Lower-case, strip format tokens and punctuation for fair comparison."""
+    text = _apply_glossary(text, glossary)
     text = _TOKEN_RE.sub(" ", text)
     text = re.sub(r"[^\w\s]", " ", text.lower())
     return " ".join(text.split())
 
 
-def compare(cache: dict[str, str], russian: dict[int, str],
-            official: dict[int, str], targets: list[int]) -> list[ComparisonRow]:
+def compare(
+    cache: dict[str, str],
+    russian: dict[int, str],
+    official: dict[int, str],
+    targets: list[int],
+    *,
+    glossary: Optional[dict[str, str]] = None,
+) -> list[ComparisonRow]:
     rows = []
     for key in targets:
         mt = cache.get(str(key))
         ref = official.get(key)
         if mt is None or ref is None or not ref.strip():
             continue
-        ratio = difflib.SequenceMatcher(None, _normalize(mt), _normalize(ref)).ratio()
+        ratio = difflib.SequenceMatcher(
+            None, _normalize(mt, glossary), _normalize(ref, glossary), autojunk=False,
+        ).ratio()
         rows.append(ComparisonRow(key, russian.get(key, ""), mt, ref, round(ratio, 3)))
     rows.sort(key=lambda r: r.similarity)
     return rows

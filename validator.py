@@ -13,12 +13,14 @@ Checks performed:
 from __future__ import annotations
 
 import logging
+import re
 import unicodedata
 from dataclasses import dataclass, field
 from enum import Enum
 from typing import Optional
 
 from parser import UcsDocument
+from merge import PLACEHOLDER
 
 logger = logging.getLogger(__name__)
 
@@ -63,6 +65,15 @@ class ValidationResult:
         self.issues.append(Issue(severity, code, key, message))
 
 
+_TOKEN_RE = re.compile(r"%\d[A-Za-z]*%")
+_CYRILLIC_RE = re.compile(r"[\u0400-\u04FF]")
+_LATIN_LOCALES = frozenset({"english", "french", "german", "spanish", "italian", "polish", "latin"})
+
+
+def _token_count(value: str) -> int:
+    return len(_TOKEN_RE.findall(value))
+
+
 def _bad_characters(value: str) -> list[str]:
     """Return descriptions of characters that break UTF-16 or indicate corruption."""
     problems = []
@@ -75,9 +86,14 @@ def _bad_characters(value: str) -> list[str]:
     return problems
 
 
-def validate(doc: UcsDocument, reference: Optional[UcsDocument] = None) -> ValidationResult:
+def validate(
+    doc: UcsDocument,
+    reference: Optional[UcsDocument] = None,
+    *,
+    locale: Optional[str] = None,
+) -> ValidationResult:
     """Validate ``doc``. If ``reference`` is given, also report IDs present in
-    the reference but missing from ``doc``."""
+    the reference but missing from ``doc``, and token-count mismatches."""
     result = ValidationResult()
 
     for line in doc.invalid_lines:
@@ -88,10 +104,17 @@ def validate(doc: UcsDocument, reference: Optional[UcsDocument] = None) -> Valid
         result.add(Severity.ERROR, "duplicate-id", key,
                    f"defined on lines {', '.join(map(str, line_numbers))}")
 
+    loc = (locale or "").lower()
     for key, value in doc.sorted_entries():
         if value == "":
             result.add(Severity.WARNING, "empty-value", key, "value is empty")
             continue
+        if value == PLACEHOLDER or PLACEHOLDER in value:
+            result.add(Severity.WARNING, "missing-literal", key,
+                       f"contains {PLACEHOLDER!r} placeholder")
+        if loc in _LATIN_LOCALES and _CYRILLIC_RE.search(value):
+            result.add(Severity.WARNING, "cyrillic-in-latin-locale", key,
+                       "Cyrillic characters in a Latin-script locale file")
         for problem in _bad_characters(value):
             result.add(Severity.ERROR, "bad-character", key, problem)
 
@@ -107,6 +130,12 @@ def validate(doc: UcsDocument, reference: Optional[UcsDocument] = None) -> Valid
         for key in missing:
             result.add(Severity.WARNING, "missing-id", key,
                        f"present in {reference.path.name if reference.path else 'reference'} but missing here")
+        for key in sorted(doc.entries.keys() & reference.entries.keys()):
+            a_tok = _token_count(doc.entries[key])
+            b_tok = _token_count(reference.entries[key])
+            if a_tok != b_tok:
+                result.add(Severity.WARNING, "token-parity", key,
+                           f"format token count mismatch ({a_tok} vs {b_tok} in reference)")
 
     logger.info("Validation of %s: %d error(s), %d warning(s)",
                 doc.path.name if doc.path else "<memory>",

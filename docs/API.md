@@ -132,6 +132,9 @@ def validate(doc: UcsDocument,
 | `bad-character` | error | lone UTF-16 surrogate or disallowed control character |
 | `empty-value` | warning | `<id><TAB>` with no text |
 | `missing-id` | warning | ID present in `reference` but absent here |
+| `missing-literal` | warning | value contains `<MISSING>` placeholder |
+| `cyrillic-in-latin-locale` | warning | Cyrillic in a Latin-script locale file |
+| `token-parity` | warning | format token count mismatch vs reference |
 
 Every value is also round-tripped through strict UTF-16-LE encoding.
 
@@ -145,10 +148,9 @@ for issue in result.errors:
     print(issue)   # [ERROR] duplicate-id (id 42): defined on lines 3, 9
 ```
 
-### statistics
+### statistics (`ucs_stats.py`)
 
-> Note: this module shadows the stdlib `statistics` module when the repo
-> root is on `sys.path` — a rename is on the backlog.
+> Formerly `statistics.py` — renamed to avoid shadowing the Python stdlib module.
 
 ```python
 def compress_ranges(keys: Iterable[int]) -> list[str]
@@ -181,7 +183,7 @@ Writes the seven report files (`russian_keys.txt`, `english_keys.txt`,
 
 ```python
 from parser import parse_file
-from statistics import Comparison, generate_report
+from ucs_stats import Comparison, generate_report
 
 comp = Comparison(parse_file("russian.ucs"), parse_file("english.ucs"))
 print(comp.statistics()["english"]["coverage_percent"])   # 38.42

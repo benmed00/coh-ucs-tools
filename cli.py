@@ -27,7 +27,7 @@ from typing import Optional
 
 from merge import PLACEHOLDER, merge_and_write
 from parser import UcsDocument, parse_file
-from statistics import REPORT_DIR, Comparison, compress_ranges, generate_report
+from ucs_stats import REPORT_DIR, Comparison, compress_ranges, generate_report
 from validator import validate
 
 logger = logging.getLogger(__name__)

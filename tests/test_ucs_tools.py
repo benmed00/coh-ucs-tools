@@ -15,7 +15,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from merge import PLACEHOLDER, merge_and_write, merge_documents
 from parser import (BOM_LE, UcsDocument, parse_bytes, parse_file, parse_text,
                     serialize, write_file)
-from statistics import Comparison, compress_ranges, generate_report
+from ucs_stats import Comparison, compress_ranges, generate_report
+from translate import protect_tokens, restore_tokens
 from validator import Severity, validate
 
 
@@ -221,6 +222,25 @@ class SortingTests(unittest.TestCase):
         doc = make_doc({100: "a", 20: "b", 3: "c"})
         self.assertEqual(doc.keys, [3, 20, 100])
         self.assertEqual([k for k, _ in doc.sorted_entries()], [3, 20, 100])
+
+
+class TokenProtectionTests(unittest.TestCase):
+    def test_protect_and_restore_tokens(self):
+        original = "Player %1PLAYERNAME% joined. Score: %2%."
+        protected, tokens = protect_tokens(original)
+        self.assertEqual(tokens, ["%1PLAYERNAME%", "%2%"])
+        self.assertNotIn("%1PLAYERNAME%", protected)
+        self.assertEqual(restore_tokens(protected, tokens), original)
+
+    def test_protect_leaves_plain_text_unchanged(self):
+        protected, tokens = protect_tokens("Invasion of Normandy")
+        self.assertEqual(protected, "Invasion of Normandy")
+        self.assertEqual(tokens, [])
+
+    def test_restore_is_order_sensitive(self):
+        text = "⟦MT0⟧ says hi to ⟦MT1⟧"
+        restored = restore_tokens(text, ["%1NAME%", "%2NAME%"])
+        self.assertEqual(restored, "%1NAME% says hi to %2NAME%")
 
 
 if __name__ == "__main__":
