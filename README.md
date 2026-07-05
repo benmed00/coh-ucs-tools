@@ -207,6 +207,9 @@ expression; otherwise a case-insensitive substring search is used.
 
 ## Web application
 
+**Live demo:** <https://coh-ucs-tools-benmed00.fly.dev> (Fly.io, Paris `cdg`).
+Deploy your own copy: [`docs/DEPLOY.md`](docs/DEPLOY.md).
+
 The `webapp/` package serves the toolkit as a REST API plus a static
 single-page frontend:
 

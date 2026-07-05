@@ -9,6 +9,7 @@ uploads/
 downloads/
 uploads/
 mt_run.log
+fly-api-key.txt
 
 # webapp runtime storage
 webapp/storage/

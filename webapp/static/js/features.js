@@ -520,6 +520,9 @@ export async function renderSettings() {
       <label class="field" style="margin-top:16px">UI language
         <select id="ui-lang"><option value="en">English</option><option value="fr">Français</option><option value="ar">العربية</option></select>
       </label>
+      <label class="field" style="margin-top:16px">API key (for uploads/merge when server requires it)
+        <input type="password" id="api-key" placeholder="X-API-Key" autocomplete="off" style="width:100%;margin-top:6px;padding:8px;background:var(--panel);border:1px solid var(--border);color:var(--text)">
+      </label>
       <p style="margin-top:16px"><a href="/docs" target="_blank">OpenAPI docs (/docs)</a> ·
         <a href="/api/export/openapi-client" target="_blank">Client snippets</a></p>
     </div>`;
@@ -532,6 +535,14 @@ export async function renderSettings() {
   document.getElementById("ui-lang").onchange = e => {
     localStorage.setItem("coh-ui-lang", e.target.value);
     toast("Language saved — reload to apply nav labels");
+  };
+  const keyInput = document.getElementById("api-key");
+  keyInput.value = localStorage.getItem("coh-api-key") || "";
+  keyInput.onchange = e => {
+    const v = e.target.value.trim();
+    if (v) localStorage.setItem("coh-api-key", v);
+    else localStorage.removeItem("coh-api-key");
+    toast("API key saved");
   };
 }
 

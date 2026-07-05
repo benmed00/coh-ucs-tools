@@ -198,5 +198,25 @@ class WebAppTests(unittest.TestCase):
         self.assertEqual(self.client.get("/").status_code, 200)
 
 
+    def test_health_public_when_api_key_set(self) -> None:
+        os.environ["UCS_API_KEY"] = "test-secret"
+        try:
+            res = self.client.get("/api/health")
+            self.assertEqual(res.status_code, 200)
+            denied = self.client.post(
+                "/api/files",
+                files={"file": ("x.ucs", ucs_bytes({1: "a"}), "application/octet-stream")},
+            )
+            self.assertEqual(denied.status_code, 401)
+            ok = self.client.post(
+                "/api/files",
+                files={"file": ("x.ucs", ucs_bytes({1: "a"}), "application/octet-stream")},
+                headers={"X-API-Key": "test-secret"},
+            )
+            self.assertEqual(ok.status_code, 201)
+        finally:
+            os.environ.pop("UCS_API_KEY", None)
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

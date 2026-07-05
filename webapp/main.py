@@ -103,16 +103,23 @@ app.include_router(router)
 
 @app.middleware("http")
 async def optional_api_key_and_rate_limit(request: Request, call_next):
-    """Optional API key check (``UCS_API_KEY`` env) and per-IP rate limiting."""
+    """Optional API key check (``UCS_API_KEY`` env) and per-IP rate limiting.
+
+    When ``UCS_API_KEY`` is set, GET/HEAD requests (and ``/api/health``) stay
+    public so the SPA and Fly health checks work; mutating methods require
+    ``X-API-Key``.
+    """
     from .rate_limit import check_rate_limit
 
+    path = request.url.path
     api_key = os.environ.get("UCS_API_KEY")
-    if api_key and request.url.path.startswith("/api/"):
+    public_api = path == "/api/health" or request.method in ("GET", "HEAD", "OPTIONS")
+    if api_key and path.startswith("/api/") and not public_api:
         header = request.headers.get("X-API-Key", "")
         if header != api_key:
             return JSONResponse(status_code=401, content={"detail": "Invalid or missing API key"})
 
-    if request.url.path.startswith("/api/"):
+    if path.startswith("/api/"):
         ip = request.client.host if request.client else "unknown"
         is_upload = request.method == "POST" and request.url.path.rstrip("/") == "/api/files"
         allowed, reason = check_rate_limit(ip, upload=is_upload)

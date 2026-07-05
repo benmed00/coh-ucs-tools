@@ -17,7 +17,12 @@ export function toast(msg, ms = 3200) {
 }
 
 export async function api(path, opts = {}) {
-  const res = await fetch(path, opts);
+  const headers = new Headers(opts.headers || {});
+  const storedKey = localStorage.getItem("coh-api-key");
+  if (storedKey && !headers.has("X-API-Key")) {
+    headers.set("X-API-Key", storedKey);
+  }
+  const res = await fetch(path, { ...opts, headers });
   if (res.status === 204) return null;
   let body = null;
   try { body = await res.json(); } catch { /* non-JSON */ }

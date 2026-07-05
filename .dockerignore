@@ -1,0 +1,32 @@
+.git
+.github
+.venv
+__pycache__
+*.pyc
+*.pyo
+.pytest_cache
+.ruff_cache
+htmlcov
+.coverage
+
+# Generated / copyrighted — never ship in the image
+downloads/
+uploads/
+report/
+webapp/data/
+webapp/storage/
+*.complete.ucs
+*.merged.ucs
+*.MT.ucs
+mt_run.log
+
+# Docs & dev artifacts (not needed at runtime)
+docs/
+desktop/
+agent-tools/
+*.md
+!README.md
+
+# Local IDE
+.cursor
+.vscode
