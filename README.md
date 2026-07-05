@@ -2,7 +2,7 @@
 
 ![Python 3.12](https://img.shields.io/badge/python-3.12-blue)
 ![License: MIT](https://img.shields.io/badge/license-MIT-green)
-![Tests](https://img.shields.io/badge/tests-29%20passing-brightgreen)
+![Tests](https://img.shields.io/badge/tests-38%20passing-brightgreen)
 
 Comparison, validation, search and migration tooling for Company of Heroes
 `.ucs` localization files (`RelicCOH.Russian.ucs` / `RelicCOH.English.ucs`) —
@@ -212,12 +212,37 @@ pip install -r requirements.txt
 python -m uvicorn webapp.main:app --reload
 ```
 
+Then open <http://127.0.0.1:8000> — a dark WW2 command-console themed SPA
+(vanilla JS ES modules, no build step; Three.js hero animation and Chart.js
+from CDN) with five sections: **Dashboard** (registered version registry with
+key-count bars), **Upload & Analyze** (drag-drop parsing, validation,
+searchable entry browser with regex toggle), **Compare** (coverage %, missing
+ranges, charts), **Merge** (placeholder / fill-from-source) and **Tools**
+(curated external references).
+
 * Interactive Swagger/OpenAPI docs: <http://127.0.0.1:8000/docs>
-  (ReDoc at `/redoc`)
-* Upload & analyze `.ucs` files, browse/search entries, validate, compare
-  two files, merge (placeholder or verbatim fill) and download the result
-* Built-in registry of known CoH1 UCS versions and a curated external-tools
-  list
+  (ReDoc at `/redoc`, raw spec at `/openapi.json`)
+* Built-in registry of known CoH1 UCS versions: version files found on this
+  machine are copied into read-only server storage at startup —
+  **original game files are never modified**
+* Server-side state lives in `uploads/` (gitignored): `files/` for uploads,
+  `versions/` for read-only version copies, `generated/` for merge results
+
+### REST API surface
+
+| Method | Path | Purpose |
+|--------|------|---------|
+| POST   | `/api/files` | multipart `.ucs` upload (max 20 MB) → file id + parse summary |
+| GET    | `/api/files`, `/api/files/{id}` | list stored files / one summary |
+| DELETE | `/api/files/{id}` | delete an upload or merge result (versions are protected) |
+| GET    | `/api/files/{id}/entries?offset=&limit=&search=&regex=` | paginated, searchable entry browser |
+| GET    | `/api/files/{id}/validate` | validation issues (duplicates, invalid lines, bad chars, …) |
+| GET    | `/api/compare?a=&b=` | coverage statistics + missing-id ranges both ways |
+| POST   | `/api/merge` | `{target_id, source_id, mode}` → merged file + download URL |
+| GET    | `/api/downloads/{id}` | stream any stored file with content-disposition |
+| GET    | `/api/versions`, `/api/versions/{id}/download` | known CoH1 UCS version registry |
+| GET    | `/api/tools` | curated external tools/references JSON |
+| GET    | `/api/health` | health check |
 
 Endpoint reference: [`docs/API.md`](docs/API.md#rest-api). The API delegates
 to the exact same core modules as the CLI.
@@ -282,11 +307,13 @@ Coverage is computed against the union of both key sets.
 python -m unittest discover -s tests -v
 ```
 
-29 tests cover parsing (BOM, encodings, tabs in values, duplicates, invalid
-lines), writing (round-trip, overwrite protection), validation (all issue
-codes), range compression, comparison statistics, merge behaviour
-(placeholders only, numeric sorting, original-file protection) and numeric
-key sorting.
+38 tests: 29 cover the core toolkit — parsing (BOM, encodings, tabs in
+values, duplicates, invalid lines), writing (round-trip, overwrite
+protection), validation (all issue codes), range compression, comparison
+statistics, merge behaviour (placeholders only, numeric sorting,
+original-file protection) and numeric key sorting. 9 more
+(`tests/test_webapp.py`, FastAPI TestClient) cover the REST API happy path
+(upload → analyze → compare → merge → download) and its error cases.
 
 ## Documentation
 
