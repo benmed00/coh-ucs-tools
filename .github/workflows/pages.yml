@@ -14,7 +14,7 @@ permissions:
 
 concurrency:
   group: pages
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 jobs:
   build:
@@ -37,18 +37,24 @@ jobs:
     runs-on: ubuntu-latest
     environment:
       name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
+      url: ${{ steps.deployment_retry.outputs.page_url || steps.deployment.outputs.page_url }}
     steps:
       - name: Deploy to GitHub Pages
         id: deployment
-        # Pin @v4 — do not float to v5; matches stable Pages API surface.
+        continue-on-error: true
         uses: actions/deploy-pages@v4
 
       - name: Wait before Pages retry
-        if: failure() && steps.deployment.outcome == 'failure'
-        run: sleep 30
+        if: steps.deployment.outcome != 'success'
+        run: sleep 45
 
       - name: Retry Pages deploy on transient failure
-        if: failure() && steps.deployment.outcome == 'failure'
+        if: steps.deployment.outcome != 'success'
         id: deployment_retry
         uses: actions/deploy-pages@v4
+
+      - name: Require successful Pages deploy
+        if: steps.deployment.outcome != 'success' && steps.deployment_retry.outcome != 'success'
+        run: |
+          echo "::error::GitHub Pages deploy failed after two attempts."
+          exit 1
