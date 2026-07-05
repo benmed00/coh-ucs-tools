@@ -21,6 +21,8 @@ import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
 STATIC_SRC = ROOT / "webapp" / "static"
 DEFAULT_API_BASE = "https://coh-ucs-tools.fly.dev"
 DEFAULT_SITE_URL = "https://benmed00.github.io/coh-ucs-tools"
