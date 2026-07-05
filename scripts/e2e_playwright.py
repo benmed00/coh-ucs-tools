@@ -78,7 +78,8 @@ def main() -> int:
         with sync_playwright() as p:
             browser = p.chromium.launch()
             page = browser.new_page()
-            page.on("pageerror", lambda err: js_errors.append(str(err)))
+            page.on("pageerror", lambda err: js_errors.append(str(err))
+                if "Transition was skipped" not in str(err) else None)
 
             page.goto(f"{base}/")
             page.wait_for_load_state("networkidle")

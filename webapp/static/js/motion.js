@@ -13,7 +13,16 @@ export function viewTransition(updateFn) {
     updateFn();
     return Promise.resolve();
   }
-  return document.startViewTransition(() => updateFn()).finished.catch(() => {});
+  try {
+    const vt = document.startViewTransition(() => updateFn());
+    return vt.finished.catch((err) => {
+      const msg = String(err?.message || err);
+      if (err?.name === "AbortError" || msg.includes("skipped")) return;
+    });
+  } catch {
+    updateFn();
+    return Promise.resolve();
+  }
 }
 
 /** Apply enter animation class; returns cleanup promise. */
