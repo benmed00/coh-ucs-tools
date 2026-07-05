@@ -83,7 +83,7 @@ def _write_fonts_css(families: dict[str, tuple[str, list[tuple[str, str, str, st
                 "  font-style: normal;",
                 f"  font-weight: {weight};",
                 "  font-display: swap;",
-                f'  src: url("/static/fonts/{fname}") format("woff2");',
+                f'  src: url("../fonts/{fname}") format("woff2");',
             ]
             if urange:
                 rule.append(f"  unicode-range: {urange};")

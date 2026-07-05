@@ -48,14 +48,14 @@ class BuildStaticUiTests(unittest.TestCase):
     def test_build_includes_card_header_and_i18n(self) -> None:
         from scripts.build_static import build_static, _SW_CACHE
 
-        self.assertEqual(_SW_CACHE, "coh-ucs-v9")
+        self.assertEqual(_SW_CACHE, "coh-ucs-v10")
         with tempfile.TemporaryDirectory() as tmp:
             out = Path(tmp) / "dist"
             build_static(out, "https://coh-ucs-tools.fly.dev", "https://benmed00.github.io/coh-ucs-tools")
             css = (out / "css" / "app.css").read_text(encoding="utf-8")
             sw = (out / "service-worker.js").read_text(encoding="utf-8")
             self.assertIn(".card-header", css)
-            self.assertIn("coh-ucs-v9", sw)
+            self.assertIn("coh-ucs-v10", sw)
             self.assertIn("./js/i18n.js", sw)
             index = (out / "index.html").read_text(encoding="utf-8")
             self.assertIn("/coh-ucs-tools/sitemap.xml", index)

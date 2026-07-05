@@ -49,7 +49,7 @@ def _rewrite_static_paths(text: str, *, base_path: str = "", depth: int = 0) -> 
     return text
 
 
-_SW_CACHE = "coh-ucs-v9"
+_SW_CACHE = "coh-ucs-v10"
 
 # Service-worker cache list uses absolute /static/ paths in source.
 _SW_ASSETS = (
@@ -216,6 +216,14 @@ def build_static(out_dir: Path, api_base: str, site_url: str) -> None:
             shutil.copytree(src, out_dir / name, dirs_exist_ok=True)
 
     base_path = _base_path_for_site(site_url)
+
+    # Rewrite /static/ URLs inside copied CSS (fonts.css @font-face src, etc.)
+    for css_file in (out_dir / "css").glob("*.css"):
+        text = css_file.read_text(encoding="utf-8")
+        rewritten = _rewrite_static_paths(text, base_path=base_path, depth=0)
+        if rewritten != text:
+            css_file.write_text(rewritten, encoding="utf-8")
+
     index_src = (STATIC_SRC / "index.html").read_text(encoding="utf-8")
 
     def _write_route_html(slug: str | None, dest: Path) -> None:

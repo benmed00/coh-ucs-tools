@@ -95,6 +95,9 @@ class BuildStaticTests(unittest.TestCase):
             self.assertIn("/coh-ucs-tools/css/app.css", index)
             self.assertIn("/coh-ucs-tools/js/app.js", index)
             self.assertNotIn("/static/css/", index)
+            fonts_css = (out / "css" / "fonts.css").read_text(encoding="utf-8")
+            self.assertNotIn('url("/static/fonts/', fonts_css)
+            self.assertIn("../fonts/", fonts_css)
             self.assertTrue((out / "about" / "index.html").is_file())
 
 
