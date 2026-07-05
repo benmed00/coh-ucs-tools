@@ -479,6 +479,7 @@ webapp tests cover diff, verify, TMX, bookmarks, and more.
 
 | Document | Contents |
 |---|---|
+| **[GitHub Wiki](https://github.com/benmed00/coh-ucs-tools/wiki)** | UI walkthroughs with screenshots, step-by-step guides, and cross-links to the docs below |
 | [`docs/PROJECT_REPORT.md`](docs/PROJECT_REPORT.md) | Full project report: format reverse engineering, comparison findings, NSV recovery, MT cross-check, verification |
 | [`docs/API.md`](docs/API.md) | Python API (signatures + examples) and REST API endpoint reference |
 | [`docs/BACKLOG.md`](docs/BACKLOG.md) | Prioritized roadmap (P1/P2/P3) |

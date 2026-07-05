@@ -354,6 +354,11 @@ async function renderTools() {
 }
 
 /* --------------------------------------------------------------- router */
+function applyRouteShell(routeKey) {
+  const landing = routeKey === "dashboard" || routeKey === "about";
+  document.documentElement.dataset.shell = landing ? "landing" : "tool";
+}
+
 const routes = {
   dashboard: renderDashboard,
   about: renderAbout,
@@ -393,6 +398,7 @@ async function route() {
   const routeKey = routes[name] ? name : "dashboard";
   setViewAnimate(routeKey !== prevRouteKey);
   prevRouteKey = routeKey;
+  applyRouteShell(routeKey);
   applyRouteSeo(routeKey);
   applyShellI18n();
   document.querySelectorAll("#nav a[data-route]").forEach(a =>

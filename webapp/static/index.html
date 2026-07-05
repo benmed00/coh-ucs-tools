@@ -16,6 +16,14 @@
 <link rel="apple-touch-icon" href="/static/icons/apple-touch-icon.png">
 </head>
 <body>
+<script>
+(function () {
+  var parts = location.pathname.replace(/\/$/, "").split("/").filter(Boolean);
+  var seg = parts.length ? parts[parts.length - 1] : "dashboard";
+  var landing = seg === "dashboard" || seg === "about" || seg === "coh-ucs-tools";
+  document.documentElement.dataset.shell = landing ? "landing" : "tool";
+})();
+</script>
 <a class="skip-link" href="#view" data-i18n="skip.main">Skip to main content</a>
 <div class="scanlines hero-scanline-pulse" aria-hidden="true"></div>
 
@@ -28,6 +36,7 @@
   <div class="topbar-actions">
     <button type="button" class="nav-toggle" id="nav-toggle" aria-expanded="false" aria-controls="nav" data-i18n="nav.menu">Menu</button>
     <nav class="nav" id="nav" aria-label="Main navigation">
+    <div class="nav-row nav-row-primary">
     <a href="/" data-route="dashboard" data-i18n="nav.dashboard">Dashboard</a>
     <a href="/upload" data-route="upload" data-i18n="nav.upload">Upload</a>
     <a href="/compare" data-route="compare" data-i18n="nav.compare">Compare</a>
@@ -37,10 +46,13 @@
     <a href="/merge-wizard" data-route="merge-wizard" data-i18n="nav.merge">Merge</a>
     <a href="/validator" data-route="validator" data-i18n="nav.validator">Validator</a>
     <a href="/verify" data-route="verify" data-i18n="nav.verify">Verify</a>
+    </div>
+    <div class="nav-row nav-row-secondary">
     <a href="/translation" data-route="translation" data-i18n="nav.translation">PO/TMX</a>
     <a href="/tools" data-route="tools" data-i18n="nav.tools">Tools</a>
     <a href="/settings" data-route="settings" data-i18n="nav.settings">Settings</a>
     <a href="/docs" target="_blank" rel="noopener noreferrer" class="nav-api" data-i18n="nav.api">API &#8599;</a>
+    </div>
     </nav>
   </div>
 </header>

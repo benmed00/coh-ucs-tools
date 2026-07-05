@@ -92,3 +92,13 @@ already excludes these paths — do not work around it.
   `chore:` with a concise imperative subject.
 * One logical change per PR; include the *why* in the description.
 * PRs must keep the test suite green.
+
+## GitHub Wiki
+
+User-facing UI guides and screenshots live in the
+[project wiki](https://github.com/benmed00/coh-ucs-tools/wiki). When you add
+SPA routes or change workflows, update the matching wiki page and run
+`python scripts/wiki_screenshots.py` to refresh screenshots (see wiki
+[Documentation Map](https://github.com/benmed00/coh-ucs-tools/wiki/Documentation-Map)).
+Repo `docs/*.md` files remain the canonical reference for API signatures,
+deployment secrets, and the full project report.
