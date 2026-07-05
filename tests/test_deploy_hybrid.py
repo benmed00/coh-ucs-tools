@@ -92,8 +92,10 @@ class BuildStaticTests(unittest.TestCase):
             config = (out / "js" / "config.js").read_text(encoding="utf-8")
             self.assertIn('window.API_BASE = "https://coh-ucs-tools.fly.dev"', config)
             index = (out / "index.html").read_text(encoding="utf-8")
-            self.assertIn('./css/app.css', index)
+            self.assertIn("/coh-ucs-tools/css/app.css", index)
+            self.assertIn("/coh-ucs-tools/js/app.js", index)
             self.assertNotIn("/static/css/", index)
+            self.assertTrue((out / "about" / "index.html").is_file())
 
 
 class ApiUrlTests(unittest.TestCase):
