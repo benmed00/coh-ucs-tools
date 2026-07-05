@@ -298,4 +298,43 @@ def crossref_similarity(a_val: str, b_val: str) -> float:
     """Simple similarity ratio between two strings."""
     if not a_val and not b_val:
         return 1.0
-    return round(difflib.SequenceMatcher(None, a_val, b_val).ratio(), 4)
+    return round(difflib.SequenceMatcher(None, a_val, b_val, autojunk=False).ratio(), 4)
+
+
+# Campaign ID ranges (approximate, from key distribution in CE Russian UCS).
+CAMPAIGN_RANGES: dict[str, list[dict]] = {
+    "base": [
+        {"name": "Core UI / shared", "start": 1, "end": 50000},
+        {"name": "Campaign missions", "start": 50001, "end": 200000},
+        {"name": "Units / abilities", "start": 200001, "end": 400000},
+    ],
+    "opposing_fronts": [
+        {"name": "OF campaign", "start": 400001, "end": 550000},
+        {"name": "OF units/doctrines", "start": 550001, "end": 700000},
+    ],
+    "tales_of_valor": [
+        {"name": "ToV campaign", "start": 700001, "end": 850000},
+        {"name": "ToV units", "start": 850001, "end": 950000},
+    ],
+    "extended": [
+        {"name": "High-range / CE extras", "start": 950001, "end": 11005454},
+    ],
+}
+
+
+def campaign_ranges() -> dict[str, list[dict]]:
+    return CAMPAIGN_RANGES
+
+
+def voice_crosslink(ucs_id: int, sga_files: list[dict]) -> list[str]:
+    """Heuristic: map UCS id ranges to speech file names from SGA listing."""
+    bucket = (ucs_id // 10000) * 10000
+    matches = []
+    for f in sga_files:
+        path = f.get("path", "").lower()
+        if "speech" not in path and "sound" not in path and "locale" not in path:
+            continue
+        if str(bucket)[:3] in path or "english" in path or "russian" in path:
+            matches.append(f.get("path", ""))
+    return matches[:10]
+

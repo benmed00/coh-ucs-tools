@@ -69,6 +69,79 @@ def default_output_path(target: UcsDocument) -> Path:
     return Path.cwd() / name
 
 
+@dataclass
+class ThreewayConflict:
+    key: int
+    base: Optional[str]
+    a: Optional[str]
+    b: Optional[str]
+    resolved: Optional[str] = None
+
+
+@dataclass
+class ThreewayMergeResult:
+    entries: dict[int, str]
+    conflicts: list[ThreewayConflict]
+    output_path: Path | None = None
+
+
+def merge_threeway(
+    base: UcsDocument,
+    a: UcsDocument,
+    b: UcsDocument,
+    *,
+    strategy: str = "prefer_a",
+) -> ThreewayMergeResult:
+    """Three-way merge: base + two branches. strategy: prefer_a|prefer_b|manual_conflicts."""
+    all_keys = sorted(base.entries.keys() | a.entries.keys() | b.entries.keys())
+    merged: dict[int, str] = {}
+    conflicts: list[ThreewayConflict] = []
+
+    for key in all_keys:
+        bv = base.entries.get(key)
+        av = a.entries.get(key)
+        bv2 = b.entries.get(key)
+        if av == bv2 or (av is not None and bv2 is not None and av == bv2):
+            merged[key] = av if av is not None else bv2  # type: ignore[assignment]
+            continue
+        if av is not None and bv2 is not None and av != bv2:
+            if strategy == "prefer_a":
+                merged[key] = av
+            elif strategy == "prefer_b":
+                merged[key] = bv2
+            else:
+                conflicts.append(ThreewayConflict(key=key, base=bv, a=av, b=bv2))
+                merged[key] = av  # placeholder until manual resolution
+            continue
+        merged[key] = av if av is not None else bv2  # type: ignore[assignment]
+
+    return ThreewayMergeResult(entries=merged, conflicts=conflicts)
+
+
+def merge_threeway_and_write(
+    base: UcsDocument,
+    a: UcsDocument,
+    b: UcsDocument,
+    output: Path | str,
+    *,
+    strategy: str = "prefer_a",
+    overwrite_output: bool = True,
+) -> ThreewayMergeResult:
+    result = merge_threeway(base, a, b, strategy=strategy)
+    out_path = Path(output)
+    write_file(
+        out_path,
+        sorted(result.entries.items()),
+        encoding=a.encoding,
+        add_bom=a.has_bom,
+        newline=a.newline,
+        trailing_newline=a.trailing_newline,
+        overwrite=overwrite_output,
+    )
+    result.output_path = out_path
+    return result
+
+
 def merge_and_write(target: UcsDocument, source: UcsDocument,
                     output: Path | str | None = None,
                     placeholder: str = PLACEHOLDER,
