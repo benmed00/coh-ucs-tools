@@ -16,7 +16,7 @@ from fastapi import APIRouter, HTTPException, Query, Request, UploadFile
 from fastapi.responses import FileResponse
 
 from merge import merge_and_write
-from statistics import Comparison, compress_ranges
+from ucs_stats import Comparison, compress_ranges
 from validator import validate
 
 from .models import (CompareResponse, CompareSide, EntriesPage, Entry,

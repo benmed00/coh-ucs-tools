@@ -138,6 +138,57 @@ class ExtendedWebAppTests(unittest.TestCase):
         self.assertEqual(res.status_code, 200)
         self.assertTrue(res.json()["a_missing"] or res.json()["b_missing"])
 
+    def test_campaign_ranges(self) -> None:
+        res = self.client.get("/api/campaigns/ranges")
+        self.assertEqual(res.status_code, 200)
+        self.assertIn("campaigns", res.json())
+
+    def test_games_profiles(self) -> None:
+        res = self.client.get("/api/games")
+        self.assertEqual(res.status_code, 200)
+        ids = [p["id"] for p in res.json()["profiles"]]
+        self.assertIn("coh1", ids)
+
+    def test_audit_csv_export(self) -> None:
+        res = self.client.get("/api/audit/export.csv")
+        self.assertEqual(res.status_code, 200)
+        self.assertIn("action", res.text)
+
+    def test_threeway_merge(self) -> None:
+        base = self.upload("base.ucs", {1: "base"})
+        a = self.upload("a.ucs", {1: "aaa", 2: "new"})
+        b = self.upload("b.ucs", {1: "bbb", 3: "other"})
+        res = self.client.post("/api/merge/threeway", json={
+            "base": base["id"], "a": a["id"], "b": b["id"], "strategy": "prefer_a",
+        })
+        self.assertEqual(res.status_code, 200)
+        self.assertGreater(res.json()["keys"], 0)
+
+    def test_community_hash_registry(self) -> None:
+        sha = "a" * 64
+        res = self.client.post("/api/community/hash", json={
+            "sha256": sha, "key_count": 100, "label": "test",
+        })
+        self.assertEqual(res.status_code, 200)
+        lst = self.client.get("/api/community/hashes")
+        self.assertTrue(any(h["sha256"] == sha for h in lst.json()["hashes"]))
+
+    def test_depot_fetch_instructions(self) -> None:
+        res = self.client.post("/api/depot/fetch-instructions", json={"depot_id": 4565})
+        self.assertEqual(res.status_code, 200)
+        self.assertIn("DepotDownloader", res.json()["command"])
+
+    def test_install_script(self) -> None:
+        res = self.client.get("/api/install/script", params={"target": str(Path.home() / "test.ucs")})
+        self.assertEqual(res.status_code, 200)
+        self.assertIn("script", res.json())
+
+    def test_projects_crud(self) -> None:
+        res = self.client.post("/api/projects", json={"name": "QA workspace"})
+        self.assertEqual(res.status_code, 200)
+        lst = self.client.get("/api/projects")
+        self.assertTrue(any(p["name"] == "QA workspace" for p in lst.json()["projects"]))
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)

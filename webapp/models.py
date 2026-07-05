@@ -357,6 +357,7 @@ class PatchBuildResponse(BaseModel):
     download_id: str
     download_url: str
     keys: int
+    changelog_tsv: Optional[str] = None
 
 
 class SgaFileInfo(BaseModel):

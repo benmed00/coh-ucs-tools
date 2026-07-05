@@ -13,9 +13,13 @@ from typing import Optional
 from fastapi import APIRouter, HTTPException, Query, Request
 from fastapi.responses import FileResponse, PlainTextResponse, Response
 
-from merge import PLACEHOLDER, merge_documents
+from game_profiles import list_profiles as game_profile_list
+from merge import PLACEHOLDER, merge_documents, merge_threeway_and_write
+from po_io import export_po, import_po
+from sga_reader import list_sga_contents
+from ucs_analysis import campaign_ranges, voice_crosslink
 from parser import serialize, write_file
-from statistics import Comparison, compress_ranges
+from ucs_stats import Comparison, compress_ranges
 from ucs_analysis import (
     crossref_similarity,
     diff_entries,
@@ -115,11 +119,7 @@ SGA_PLUGIN_TOOLS = [
      "category": "SGA tools", "description": "Community tools for extracting Relic archive formats."},
 ]
 
-GAME_PROFILES = [
-    {"id": "coh1", "encoding": "utf-16-le", "notes": "BOM FF FE, CRLF, id<TAB>text. Engine fallback: $id No Key."},
-    {"id": "coh2", "encoding": "utf-16-le", "notes": "Similar to CoH1; key ranges differ. Stub profile — verify before use."},
-    {"id": "dow1", "encoding": "utf-16-le", "notes": "Dawn of War UCS dialect; different id namespaces."},
-]
+GAME_PROFILES = game_profile_list()
 
 
 # ------------------------------------------------------------------ diff
@@ -325,7 +325,26 @@ def mt_queue(request: Request, req: MtQueueRequest) -> dict:
                 summary="MT job status")
 def mt_status_endpoint() -> MtStatusResponse:
     s = services.mt_status()
-    return MtStatusResponse(**{k: s.get(k, "" if k == "message" else 0) for k in ("status", "progress", "total", "message")})
+    return MtStatusResponse(**{k: s.get(k, "" if k == "message" else 0)
+                               for k in ("status", "progress", "total", "message")})
+
+
+@ext_router.post("/mt/cancel", tags=["analysis"], summary="Cancel running MT job")
+def mt_cancel() -> dict:
+    from . import jobs
+    job = jobs.latest_job()
+    if job:
+        jobs.cancel_job(job.id)
+    return services.mt_status()
+
+
+@ext_router.post("/mt/resume", tags=["analysis"], summary="Resume paused MT job")
+def mt_resume() -> dict:
+    from . import jobs
+    job = jobs.latest_job()
+    if job:
+        jobs.resume_job(job.id)
+    return services.mt_status()
 
 
 @ext_router.get("/mt/report", tags=["analysis"], summary="MT comparison report JSON")
@@ -535,8 +554,115 @@ def game_profiles() -> dict:
     return {"profiles": GAME_PROFILES}
 
 
+@ext_router.get("/audit", tags=["meta"], response_model=AuditResponse,
+                summary="Recent operations audit log")
+def get_audit_log(limit: int = Query(50, ge=1, le=200)) -> AuditResponse:
+    from .models import AuditEntry
+    entries = [AuditEntry(**e) for e in services.get_audit(limit)]
+    return AuditResponse(entries=entries)
+
+
+@ext_router.get("/audit/export.csv", tags=["meta"], response_class=PlainTextResponse,
+                summary="Export audit log as CSV")
+def audit_export_csv(limit: int = Query(500, ge=1, le=5000)) -> PlainTextResponse:
+    buf = io.StringIO()
+    w = csv.writer(buf)
+    w.writerow(["ts", "action", "detail", "file_id"])
+    for e in services.get_audit(limit):
+        w.writerow([e.get("ts", ""), e.get("action", ""), e.get("detail", ""), e.get("file_id", "")])
+    return PlainTextResponse(buf.getvalue(), media_type="text/csv",
+                               headers={"Content-Disposition": 'attachment; filename="audit.csv"'})
+
+
+# ---------------------------------------------------------- new endpoints
+@ext_router.get("/sga/{path:path}/contents", tags=["tools"], summary="List SGA internal files")
+def sga_contents(path: str) -> dict:
+    p = Path(path)
+    if not p.exists():
+        raise HTTPException(404, f"SGA not found: {path}")
+    return list_sga_contents(p)
+
+
+@ext_router.get("/campaigns/ranges", tags=["analysis"], summary="Campaign ID range map")
+def campaigns_ranges() -> dict:
+    return {"campaigns": campaign_ranges()}
+
+
+@ext_router.post("/merge/threeway", tags=["merge"], summary="Three-way UCS merge")
+def merge_threeway_api(request: Request, body: dict) -> dict:
+    store = get_store(request)
+    base_id = body.get("base")
+    a_id = body.get("a")
+    b_id = body.get("b")
+    strategy = body.get("strategy", "prefer_a")
+    if strategy not in ("prefer_a", "prefer_b", "manual_conflicts"):
+        raise HTTPException(400, "strategy must be prefer_a, prefer_b, or manual_conflicts")
+    for fid in (base_id, a_id, b_id):
+        _get_record(store, fid)
+    base = store.document(base_id)
+    a_doc = store.document(a_id)
+    b_doc = store.document(b_id)
+    out_path = store.generated_dir / f"threeway-{uuid.uuid4().hex}.ucs"
+    result = merge_threeway_and_write(base, a_doc, b_doc, out_path, strategy=strategy)
+    gen = store.add_generated(out_path, "merged-threeway.ucs")
+    services.audit_log("merge_threeway", f"{len(result.entries)} keys, {len(result.conflicts)} conflicts")
+    services.fire_webhooks("merge_complete", {"file_id": gen.id, "keys": len(result.entries)})
+    return {
+        "download_id": gen.id,
+        "download_url": f"/api/downloads/{gen.id}",
+        "keys": len(result.entries),
+        "conflicts": [
+            {"key": c.key, "base": c.base, "a": c.a, "b": c.b}
+            for c in result.conflicts
+        ],
+    }
+
+
+@ext_router.post("/files/{file_id}/save", tags=["files"], summary="Save edited UCS as new upload")
+async def save_file_edited(request: Request, file_id: str, body: dict) -> dict:
+    store = get_store(request)
+    rec = _get_record(store, file_id)
+    entries = body.get("entries", [])
+    if not entries:
+        raise HTTPException(400, "entries required")
+    parsed = [(int(e["key"]), str(e["value"])) for e in entries]
+    out_path = store.generated_dir / f"edit-{uuid.uuid4().hex}.ucs"
+    doc = store.document(file_id)
+    write_file(out_path, sorted(parsed), encoding=doc.encoding, add_bom=doc.has_bom,
+                newline=doc.newline, trailing_newline=doc.trailing_newline, overwrite=True)
+    gen = store.add_generated(out_path, f"edited-{rec.name}")
+    services.audit_log("editor_save", rec.name, file_id=gen.id)
+    return {"file_id": gen.id, "download_url": f"/api/downloads/{gen.id}"}
+
+
+@ext_router.get("/files/{file_id}/po", tags=["files"], response_class=PlainTextResponse,
+                summary="Export UCS to PO/Gettext")
+def export_file_po(request: Request, file_id: str) -> PlainTextResponse:
+    store = get_store(request)
+    _get_record(store, file_id)
+    doc = store.document(file_id)
+    return PlainTextResponse(export_po(doc), media_type="text/plain",
+                               headers={"Content-Disposition": f'attachment; filename="{file_id}.po"'})
+
+
+@ext_router.post("/files/{file_id}/po", tags=["files"], summary="Import PO into new UCS upload")
+async def import_file_po(request: Request, file_id: str, body: dict) -> dict:
+    store = get_store(request)
+    rec = _get_record(store, file_id)
+    po_text = body.get("po", "")
+    if not po_text:
+        raise HTTPException(400, "po text required")
+    entries = import_po(po_text)
+    doc = store.document(file_id)
+    out_path = store.generated_dir / f"po-{uuid.uuid4().hex}.ucs"
+    write_file(out_path, sorted(entries.items()), encoding=doc.encoding, add_bom=doc.has_bom,
+                newline=doc.newline, trailing_newline=doc.trailing_newline, overwrite=True)
+    gen = store.add_generated(out_path, f"from-po-{rec.name}")
+    return {"file_id": gen.id, "keys": len(entries)}
+
+
 @ext_router.post("/patch/build", tags=["merge"], response_model=PatchBuildResponse,
-                 summary="Build subset UCS from ranges")
+                 summary="Build subset UCS from ranges (+ optional changelog TSV)")
 def patch_build(request: Request, req: PatchBuildRequest) -> PatchBuildResponse:
     store = get_store(request)
     rec = _get_record(store, req.file_id)
@@ -547,15 +673,140 @@ def patch_build(request: Request, req: PatchBuildRequest) -> PatchBuildResponse:
     out_path = store.generated_dir / f"patch-{uuid.uuid4().hex}.ucs"
     write_file(out_path, sorted(subset.items()), overwrite=True)
     gen = store.add_generated(out_path, f"{rec.name.split('.')[0]}.patch.ucs")
+    changelog = "id\tvalue\n" + "\n".join(f"{k}\t{v}" for k, v in sorted(subset.items()))
     services.audit_log("patch_build", f"{len(subset)} keys", file_id=req.file_id)
     return PatchBuildResponse(
         download_id=gen.id, download_url=f"/api/downloads/{gen.id}", keys=len(subset),
+        changelog_tsv=changelog,
     )
 
 
-@ext_router.get("/audit", tags=["meta"], response_model=AuditResponse,
-                summary="Recent operations audit log")
-def get_audit_log(limit: int = Query(50, ge=1, le=200)) -> AuditResponse:
-    from .models import AuditEntry
-    entries = [AuditEntry(**e) for e in services.get_audit(limit)]
-    return AuditResponse(entries=entries)
+@ext_router.get("/install/script", tags=["tools"], summary="Install automation script")
+def install_script(target: str = Query(...)) -> dict:
+    target_path = Path(target)
+    writable_roots = [Path.home(), Path.cwd(), Path("uploads")]
+    is_safe = any(
+        str(target_path.resolve()).startswith(str(r.resolve()))
+        for r in writable_roots if r.exists()
+    )
+    script = (
+        f'# Backup\nCopy-Item "{target}" "{target}.bak" -Force\n'
+        f'# Install (run only after verifying paths)\n'
+        f'Copy-Item ".\\RelicCOH.English.complete.ucs" "{target}" -Force\n'
+    )
+    if not is_safe and "Program Files" in str(target_path):
+        script = (
+            f"# ELEVATED INSTALL REQUIRED — target is under Program Files\n"
+            f"# Run PowerShell as Administrator:\n{script}"
+        )
+    return {"target": str(target_path), "script": script, "requires_elevation": not is_safe}
+
+
+@ext_router.post("/install/apply", tags=["tools"], summary="Apply install (user-writable paths only)")
+def install_apply(body: dict) -> dict:
+    if not body.get("confirm"):
+        raise HTTPException(400, "confirm: true required")
+    target = Path(body.get("target", ""))
+    source = Path(body.get("source", "RelicCOH.English.complete.ucs"))
+    if not source.exists():
+        raise HTTPException(404, f"Source not found: {source}")
+    if "Program Files" in str(target.resolve()):
+        raise HTTPException(403, "Refusing to write under Program Files — use install/script for elevated commands")
+    writable = [Path.home(), Path.cwd(), Path("uploads")]
+    if not any(str(target.resolve()).startswith(str(r.resolve())) for r in writable if r.exists()):
+        raise HTTPException(403, "Target must be under a user-writable path")
+    target.parent.mkdir(parents=True, exist_ok=True)
+    import shutil
+    shutil.copyfile(source, target)
+    services.audit_log("install_apply", str(target))
+    return {"installed": str(target), "keys_source": str(source)}
+
+
+@ext_router.post("/depot/fetch-instructions", tags=["tools"], summary="French depot download instructions")
+def depot_fetch_instructions(body: dict) -> dict:
+    depot_id = body.get("depot_id", 4565)
+    app_id = body.get("app_id", 4560)
+    cmd = f"DepotDownloader -app {app_id} -depot {depot_id} -lang french"
+    return {
+        "command": cmd,
+        "expected_file": "downloads/RelicCOH.French.NSV.ucs",
+        "note": "DepotDownloader must be run in your shell. Upload the file when ready.",
+        "upload_fallback": "POST /api/files with the downloaded RelicCoH.French.ucs",
+    }
+
+
+@ext_router.post("/depot/import", tags=["tools"], summary="Import French depot UCS and build complete")
+def depot_import(request: Request) -> dict:
+    french_nsv = Path("downloads/RelicCOH.French.NSV.ucs")
+    if not french_nsv.exists():
+        alt = Path("downloads/RelicCoH.French.ucs")
+        if alt.exists():
+            french_nsv = alt
+        else:
+            raise HTTPException(404, "Place French UCS at downloads/RelicCOH.French.NSV.ucs or upload via /api/files")
+    import subprocess
+    import sys
+    result = subprocess.run(
+        [sys.executable, "build_french.py", "--nsv", str(french_nsv)],
+        capture_output=True, text=True, cwd=str(Path.cwd()),
+    )
+    out = Path("RelicCOH.French.complete.ucs")
+    store = get_store(request)
+    if out.exists():
+        rec = store.register_version(
+            "french-complete", "RelicCOH.French.complete.ucs", out,
+            origin="Built via depot import", completeness="Union build",
+            notes="Official French NSV + placeholders",
+        )
+        return {"built": True, "version_id": rec.id if rec else None, "stdout": result.stdout[-500:]}
+    return {"built": False, "stderr": result.stderr[-500:]}
+
+
+@ext_router.post("/community/hash", tags=["meta"], summary="Register community UCS hash metadata")
+def community_hash_register(body: dict) -> dict:
+    from .db import get_db
+    sha = body.get("sha256", "").lower()
+    if not sha or len(sha) != 64:
+        raise HTTPException(400, "sha256 required (64 hex chars)")
+    get_db().execute(
+        "INSERT OR REPLACE INTO community_hashes(sha256, key_count, label, registered_at) VALUES (?,?,?,?)",
+        (sha, int(body.get("key_count", 0)), body.get("label", ""), __import__("time").time()),
+    )
+    return {"registered": sha}
+
+
+@ext_router.get("/community/hashes", tags=["meta"], summary="List community hash registry")
+def community_hash_list() -> dict:
+    from .db import get_db
+    rows = get_db().fetchall("SELECT sha256, key_count, label, registered_at FROM community_hashes")
+    return {"hashes": [dict(r) for r in rows]}
+
+
+@ext_router.post("/webhooks", tags=["meta"], summary="Register webhook URL")
+def register_webhook(body: dict) -> dict:
+    from .db import get_db
+    wid = uuid.uuid4().hex
+    events = body.get("events", ["merge_complete", "compare_complete"])
+    get_db().execute(
+        "INSERT INTO webhooks(id, url, events, created_at) VALUES (?,?,?,?)",
+        (wid, body.get("url", ""), json.dumps(events), __import__("time").time()),
+    )
+    return {"id": wid, "url": body.get("url"), "events": events}
+
+
+@ext_router.get("/projects", tags=["meta"], summary="List workspaces/projects")
+def list_projects() -> dict:
+    from .db import get_db
+    rows = get_db().fetchall("SELECT * FROM projects ORDER BY created_at")
+    return {"projects": [dict(r) for r in rows]}
+
+
+@ext_router.post("/projects", tags=["meta"], summary="Create workspace/project")
+def create_project(body: dict) -> dict:
+    from .db import get_db
+    pid = uuid.uuid4().hex
+    get_db().execute(
+        "INSERT INTO projects(id, name, created_at, notes) VALUES (?,?,?,?)",
+        (pid, body.get("name", "Untitled"), __import__("time").time(), body.get("notes", "")),
+    )
+    return {"id": pid, "name": body.get("name")}
