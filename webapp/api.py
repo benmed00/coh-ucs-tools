@@ -299,7 +299,9 @@ def merge_files(request: Request, req: MergeRequest) -> MergeResponse:
     result = merge_and_write(target, source, out_path,
                              fill_from_source=(req.mode == "fill_from_source"))
 
-    base = target_rec.name[:-4] if target_rec.name.lower().endswith(".ucs") else target_rec.name
+    base = target_rec.name.split(" (")[0]  # drop display suffixes like " (THQ retail)"
+    if base.lower().endswith(".ucs"):
+        base = base[:-4]
     download_name = f"{base}.merged.ucs"
     rec = store.add_generated(out_path, download_name)
     logger.info("Merged %s + %s -> %s (%d entries, %d added)",
