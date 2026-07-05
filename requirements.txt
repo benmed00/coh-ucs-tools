@@ -1,0 +1,10 @@
+# Core toolkit runs on the Python 3.12 standard library alone.
+# chardet is OPTIONAL: it is only consulted as a fallback when a UCS file
+# has no BOM and is not valid UTF-16-LE.
+chardet>=5.2.0
+
+# Web application / REST API (webapp/ package)
+fastapi==0.139.0
+uvicorn==0.50.0
+python-multipart==0.0.32   # multipart uploads
+httpx==0.28.1              # FastAPI TestClient transport (tests)

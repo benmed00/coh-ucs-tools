@@ -1,0 +1,18 @@
+# generated outputs
+report/
+*.merged.ucs
+uploads/
+*.complete.ucs
+
+# downloaded / recovered game data (copyrighted text - never commit)
+downloads/
+uploads/
+mt_run.log
+
+# webapp runtime storage
+webapp/storage/
+
+# python
+__pycache__/
+*.pyc
+.venv/
