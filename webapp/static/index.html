@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>CoH UCS Tools — localization command console</title>
+<meta name="description" content="Analyze, compare and merge Company of Heroes .ucs localization files.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Allerta+Stencil&family=IBM+Plex+Mono:wght@400;500;600&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/static/css/app.css">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>&#9737;</text></svg>">
+</head>
+<body>
+<div class="scanlines" aria-hidden="true"></div>
+
+<header class="topbar">
+  <a class="brand" href="#/dashboard">
+    <span class="brand-mark">&#9737;</span>
+    <span class="brand-name">CoH&nbsp;UCS&nbsp;TOOLS</span>
+    <span class="brand-sub">LOCALE&nbsp;COMMAND&nbsp;CONSOLE</span>
+  </a>
+  <nav class="nav" id="nav">
+    <a href="#/dashboard" data-route="dashboard">Dashboard</a>
+    <a href="#/upload" data-route="upload">Upload &amp; Analyze</a>
+    <a href="#/compare" data-route="compare">Compare</a>
+    <a href="#/merge" data-route="merge">Merge</a>
+    <a href="#/tools" data-route="tools">Tools</a>
+    <a href="/docs" target="_blank" rel="noopener" class="nav-api">API /docs &#8599;</a>
+  </nav>
+</header>
+
+<section class="hero" id="hero">
+  <canvas id="hero-canvas" aria-hidden="true"></canvas>
+  <div class="hero-fallback" id="hero-fallback" hidden aria-hidden="true">
+    <div class="radar-css"><div class="radar-sweep"></div></div>
+  </div>
+  <div class="hero-copy">
+    <h1>UCS LOCALIZATION<br>COMMAND CONSOLE</h1>
+    <p class="hero-tag">Analyze &middot; compare &middot; merge Company&nbsp;of&nbsp;Heroes <code>.ucs</code> files.
+       UTF-16-LE, <code>FF&nbsp;FE</code> BOM, CRLF, <code>id&#8677;text</code> — we speak it fluently.</p>
+    <div class="hero-badges">
+      <span class="badge" data-tip="Every UCS file starts with the 2-byte little-endian byte-order mark FF FE.">BOM FF FE</span>
+      <span class="badge" data-tip="Values are everything after the FIRST tab — they may legally contain more tabs.">TAB separated</span>
+      <span class="badge" data-tip="When the engine can't resolve an id it renders '$id No Key' in-game.">$id No Key</span>
+      <span class="badge" data-tip="The format has no comment syntax. Anything that isn't id&#8677;text is invalid.">no comments</span>
+    </div>
+  </div>
+</section>
+
+<main id="view" class="view"><div class="loading">Booting console&hellip;</div></main>
+
+<footer class="footer">
+  <span>coh-ucs-tools &middot; FastAPI + vanilla JS &middot; no build step</span>
+  <span><a href="/docs" target="_blank" rel="noopener">Swagger</a> &middot;
+        <a href="/redoc" target="_blank" rel="noopener">ReDoc</a> &middot;
+        <a href="/openapi.json" target="_blank" rel="noopener">openapi.json</a></span>
+</footer>
+
+<div id="toast" class="toast" hidden></div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.js"></script>
+<script type="module" src="/static/js/hero.js"></script>
+<script type="module" src="/static/js/app.js"></script>
+</body>
+</html>
