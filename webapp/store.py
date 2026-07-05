@@ -5,9 +5,9 @@ All server-side state lives under ``uploads/`` (gitignored):
 * ``uploads/files/``      — user-uploaded ``.ucs`` files (UUID-named)
 * ``uploads/versions/``   — read-only copies of the built-in known versions
 * ``uploads/generated/``  — merge results offered for download
-* ``uploads/index.json``  — the metadata index
+* ``uploads/index.json``  — legacy metadata index (migrated to SQLite on first run)
 
-Original game files are **never** modified: registered versions are copied
+Metadata is persisted in SQLite (:mod:`webapp.db`); ``.ucs`` bytes stay on disk.
 into ``uploads/versions/`` once at startup and served from there.
 """
 
@@ -53,6 +53,7 @@ class StoredFile:
     origin: str = ""
     completeness: str = ""
     notes: str = ""
+    project_id: str = ""
 
     def to_dict(self) -> dict:
         return asdict(self)
@@ -72,7 +73,58 @@ class FileStore:
         self._lock = threading.Lock()
         self._records: dict[str, StoredFile] = {}
         self._docs: dict[str, UcsDocument] = {}  # lazy parse cache
-        self._load_index()
+        self._db = None
+        try:
+            from .db import get_db
+            self._db = get_db()
+            self._load_db()
+        except Exception as exc:
+            logger.warning("SQLite unavailable, using JSON index: %s", exc)
+        if not self._records:
+            self._load_index()
+
+    def _load_db(self) -> None:
+        if not self._db:
+            return
+        rows = self._db.fetchall("SELECT * FROM uploads")
+        for row in rows:
+            rec = StoredFile(
+                id=row["id"], name=row["name"], kind=row["kind"],
+                stored_path=row["stored_path"], size=row["size"],
+                created_at=row["created_at"], keys=row["keys"],
+                duplicates=row["duplicates"], invalid_lines=row["invalid_lines"],
+                empty_values=row["empty_values"], encoding=row["encoding"],
+                has_bom=bool(row["has_bom"]),
+                newline=row["newline"] or "",
+                min_key=row["min_key"], max_key=row["max_key"],
+                origin=row["origin"] or "", completeness=row["completeness"] or "",
+                notes=row["notes"] or "", project_id=row["project_id"] or "",
+            )
+            if Path(rec.stored_path).exists():
+                self._records[rec.id] = rec
+        logger.info("Loaded %d file record(s) from SQLite", len(self._records))
+
+    def _save_db(self, rec: StoredFile) -> None:
+        if not self._db:
+            return
+        self._db.execute(
+            """INSERT OR REPLACE INTO uploads
+            (id, name, kind, stored_path, size, created_at, keys, duplicates,
+             invalid_lines, empty_values, encoding, has_bom, newline,
+             min_key, max_key, origin, completeness, notes, project_id)
+            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+            (
+                rec.id, rec.name, rec.kind, rec.stored_path, rec.size, rec.created_at,
+                rec.keys, rec.duplicates, rec.invalid_lines, rec.empty_values,
+                rec.encoding, 1 if rec.has_bom else 0, rec.newline,
+                rec.min_key, rec.max_key, rec.origin, rec.completeness,
+                rec.notes, rec.project_id,
+            ),
+        )
+
+    def _delete_db(self, file_id: str) -> None:
+        if self._db:
+            self._db.execute("DELETE FROM uploads WHERE id=?", (file_id,))
 
     # ------------------------------------------------------------- index io
     def _load_index(self) -> None:
@@ -125,6 +177,7 @@ class FileStore:
         with self._lock:
             self._records[file_id] = rec
             self._docs[file_id] = doc
+            self._save_db(rec)
             self._save_index()
         logger.info("Stored upload %s (%s, %d keys)", file_id, rec.name, rec.keys)
         return rec
@@ -158,6 +211,7 @@ class FileStore:
             with self._lock:
                 self._records[version_id] = rec
                 self._docs[version_id] = doc
+                self._save_db(rec)
                 self._save_index()
             logger.info("Registered version %s (%d keys)", version_id, rec.keys)
             return rec
@@ -176,6 +230,7 @@ class FileStore:
         with self._lock:
             self._records[file_id] = rec
             self._docs[file_id] = doc
+            self._save_db(rec)
             self._save_index()
         return rec
 
@@ -189,6 +244,7 @@ class FileStore:
                 raise PermissionError("Built-in versions are read-only and cannot be deleted")
             self._records.pop(file_id)
             self._docs.pop(file_id, None)
+            self._delete_db(file_id)
             self._save_index()
         Path(rec.stored_path).unlink(missing_ok=True)
         logger.info("Deleted %s (%s)", file_id, rec.name)

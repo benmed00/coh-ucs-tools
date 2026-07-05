@@ -56,6 +56,13 @@ def _write_json(path: Path, data: Any) -> None:
 # ---------------------------------------------------------------- glossary
 def get_glossary() -> dict[str, str]:
     ensure_storage()
+    try:
+        from .db import get_db
+        rows = get_db().fetchall("SELECT term, replacement FROM glossary")
+        if rows:
+            return {r["term"]: r["replacement"] for r in rows}
+    except Exception:
+        pass
     data = _read_json(GLOSSARY_PATH, {})
     return {str(k): str(v) for k, v in data.items()}
 
@@ -64,12 +71,32 @@ def put_glossary(terms: dict[str, str]) -> dict[str, str]:
     ensure_storage()
     clean = {str(k): str(v) for k, v in terms.items()}
     _write_json(GLOSSARY_PATH, clean)
+    try:
+        from .db import get_db
+        import time as _time
+        db = get_db()
+        db.execute("DELETE FROM glossary")
+        now = _time.time()
+        for term, repl in clean.items():
+            db.execute(
+                "INSERT INTO glossary(term, replacement, updated_at) VALUES (?,?,?)",
+                (term, repl, now),
+            )
+    except Exception:
+        pass
     return clean
 
 
 # --------------------------------------------------------------- bookmarks
 def get_bookmarks() -> list[int]:
     ensure_storage()
+    try:
+        from .db import get_db
+        rows = get_db().fetchall("SELECT key_id FROM bookmarks ORDER BY key_id")
+        if rows:
+            return [int(r["key_id"]) for r in rows]
+    except Exception:
+        pass
     data = _read_json(BOOKMARKS_PATH, {"ids": []})
     return sorted(int(x) for x in data.get("ids", []))
 
@@ -80,12 +107,25 @@ def add_bookmark(key: int) -> list[int]:
         ids.append(key)
         ids.sort()
         _write_json(BOOKMARKS_PATH, {"ids": ids})
+        try:
+            from .db import get_db
+            get_db().execute(
+                "INSERT OR IGNORE INTO bookmarks(key_id, created_at) VALUES (?,?)",
+                (key, time.time()),
+            )
+        except Exception:
+            pass
     return ids
 
 
 def remove_bookmark(key: int) -> list[int]:
     ids = [i for i in get_bookmarks() if i != key]
     _write_json(BOOKMARKS_PATH, {"ids": ids})
+    try:
+        from .db import get_db
+        get_db().execute("DELETE FROM bookmarks WHERE key_id=?", (key,))
+    except Exception:
+        pass
     return ids
 
 
@@ -101,35 +141,50 @@ MAX_AUDIT = 200
 
 def audit_log(action: str, detail: str = "", *, file_id: str = "") -> None:
     ensure_storage()
+    entry = {"ts": time.time(), "action": action, "detail": detail, "file_id": file_id}
     with _lock:
         data = _read_json(AUDIT_PATH, {"entries": []})
         entries = data.get("entries", [])
-        entries.append({
-            "ts": time.time(),
-            "action": action,
-            "detail": detail,
-            "file_id": file_id,
-        })
+        entries.append(entry)
         data["entries"] = entries[-MAX_AUDIT:]
         _write_json(AUDIT_PATH, data)
+    try:
+        from .db import get_db
+        get_db().execute(
+            "INSERT INTO audit_log(ts, action, detail, file_id) VALUES (?,?,?,?)",
+            (entry["ts"], action, detail, file_id),
+        )
+    except Exception:
+        pass
 
 
 def get_audit(limit: int = 50) -> list[dict]:
     ensure_storage()
+    try:
+        from .db import get_db
+        rows = get_db().fetchall(
+            "SELECT ts, action, detail, file_id FROM audit_log ORDER BY ts DESC LIMIT ?",
+            (limit,),
+        )
+        if rows:
+            return [dict(r) for r in rows]
+    except Exception:
+        pass
     entries = _read_json(AUDIT_PATH, {"entries": []}).get("entries", [])
     return list(reversed(entries[-limit:]))
 
 
 # ---------------------------------------------------------------- MT jobs
-_mt_thread: Optional[threading.Thread] = None
-
-
 def mt_status() -> dict:
-    ensure_storage()
-    return _read_json(MT_STATUS_PATH, {"status": "idle"})
+    from . import jobs
+    return jobs.job_status_dict()
 
 
 def mt_report() -> dict:
+    from . import jobs
+    job = jobs.latest_job()
+    if job and job.report:
+        return job.report
     ensure_storage()
     return _read_json(MT_REPORT_PATH, {"rows": []})
 
@@ -142,71 +197,17 @@ def queue_mt_job(
     tl: str,
     limit: Optional[int],
 ) -> dict:
-    """Start MT comparison in a background thread (uses translate.py)."""
-    global _mt_thread
-    ensure_storage()
+    """Start MT comparison via the persistent job queue."""
+    from . import jobs
 
-    def worker() -> None:
-        from parser import parse_file
-        from translate import MtClient, protect_tokens, restore_tokens
-
-        status = {"status": "running", "progress": 0, "total": 0, "message": "starting"}
-        _write_json(MT_STATUS_PATH, status)
-        try:
-            source = parse_file(source_path)
-            ref = parse_file(reference_path) if reference_path and reference_path.exists() else None
-            keys = sorted(source.entries.keys())
-            if limit:
-                keys = keys[:limit]
-            status["total"] = len(keys)
-            _write_json(MT_STATUS_PATH, status)
-
-            client = MtClient(source=sl, target=tl)
-            rows = []
-            for idx, key in enumerate(keys, 1):
-                ru_val = source.entries[key]
-                protected, tokens = protect_tokens(ru_val)
-                try:
-                    mt_val = restore_tokens(client.translate(protected), tokens)
-                except Exception as exc:
-                    mt_val = f"[MT error: {exc}]"
-                ref_val = ref.entries.get(key, "") if ref else ""
-                rows.append({
-                    "key": key,
-                    "source": ru_val,
-                    "mt": mt_val,
-                    "reference": ref_val,
-                })
-                if idx % 10 == 0 or idx == len(keys):
-                    _write_json(MT_STATUS_PATH, {
-                        "status": "running",
-                        "progress": idx,
-                        "total": len(keys),
-                        "message": f"translated {idx}/{len(keys)}",
-                    })
-            _write_json(MT_REPORT_PATH, {"rows": rows, "sl": sl, "tl": tl})
-            _write_json(MT_STATUS_PATH, {
-                "status": "done",
-                "progress": len(keys),
-                "total": len(keys),
-                "message": f"completed {len(keys)} entries",
-            })
-        except Exception as exc:
-            logger.exception("MT job failed")
-            _write_json(MT_STATUS_PATH, {
-                "status": "error",
-                "progress": 0,
-                "total": 0,
-                "message": str(exc),
-            })
-
-    with _lock:
-        current = mt_status()
-        if current.get("status") == "running" and _mt_thread and _mt_thread.is_alive():
-            return {"queued": False, "message": "job already running", **current}
-        _mt_thread = threading.Thread(target=worker, daemon=True, name="mt-worker")
-        _mt_thread.start()
-    return {"queued": True, **mt_status()}
+    try:
+        job = jobs.queue_job(
+            source_path=source_path, reference_path=reference_path,
+            sl=sl, tl=tl, limit=limit,
+        )
+        return {"queued": True, **jobs.job_status_dict(job)}
+    except RuntimeError as exc:
+        return {"queued": False, "message": str(exc), **jobs.job_status_dict()}
 
 
 # ----------------------------------------------------------- batch compare
@@ -221,7 +222,7 @@ class BatchJob:
 
 def run_batch_compare(file_ids: list[str], store) -> BatchJob:
     """Compare all pairs; write JSON zip to batch dir."""
-    from statistics import Comparison
+    from ucs_stats import Comparison
 
     job_id = uuid.uuid4().hex
     pairs = []
@@ -247,6 +248,29 @@ def run_batch_compare(file_ids: list[str], store) -> BatchJob:
 def batch_zip_path(job_id: str) -> Optional[Path]:
     p = BATCH_DIR / f"{job_id}.zip"
     return p if p.exists() else None
+
+
+def fire_webhooks(event: str, payload: dict) -> None:
+    """Fire registered webhooks (metadata only, no string content)."""
+    try:
+        import urllib.request
+        from .db import get_db
+        rows = get_db().fetchall("SELECT url, events FROM webhooks")
+        for row in rows:
+            events = json.loads(row["events"] or "[]")
+            if event not in events:
+                continue
+            body = json.dumps({"event": event, **payload}).encode()
+            req = urllib.request.Request(
+                row["url"], data=body, method="POST",
+                headers={"Content-Type": "application/json"},
+            )
+            try:
+                urllib.request.urlopen(req, timeout=5)
+            except Exception as exc:
+                logger.warning("Webhook %s failed: %s", row["url"], exc)
+    except Exception:
+        pass
 
 
 def cleanup_old_uploads(store, max_age_hours: float = 24) -> int:

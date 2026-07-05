@@ -67,8 +67,11 @@ async def lifespan(app: FastAPI):
     """Create the file store and register known versions found on disk.
 
     ``UCS_WEBAPP_UPLOADS`` overrides the storage directory (used by tests).
+    ``SQLITE_PATH`` overrides the SQLite database path.
     """
+    from .db import get_db
     services.ensure_storage()
+    get_db()  # init + migrate JSON storage
     store = FileStore(os.environ.get("UCS_WEBAPP_UPLOADS", "uploads"))
     app.state.store = store
     for meta in KNOWN_VERSIONS:
@@ -100,12 +103,22 @@ app.include_router(router)
 
 @app.middleware("http")
 async def optional_api_key_and_rate_limit(request: Request, call_next):
-    """Optional API key check (``UCS_API_KEY`` env) and basic rate limiting."""
+    """Optional API key check (``UCS_API_KEY`` env) and per-IP rate limiting."""
+    from .rate_limit import check_rate_limit
+
     api_key = os.environ.get("UCS_API_KEY")
     if api_key and request.url.path.startswith("/api/"):
         header = request.headers.get("X-API-Key", "")
         if header != api_key:
             return JSONResponse(status_code=401, content={"detail": "Invalid or missing API key"})
+
+    if request.url.path.startswith("/api/"):
+        ip = request.client.host if request.client else "unknown"
+        is_upload = request.method == "POST" and request.url.path.rstrip("/") == "/api/files"
+        allowed, reason = check_rate_limit(ip, upload=is_upload)
+        if not allowed:
+            return JSONResponse(status_code=429, content={"detail": reason})
+
     response = await call_next(request)
     return response
 
