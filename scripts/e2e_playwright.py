@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import json
 import os
 import subprocess
 import sys
@@ -49,7 +50,8 @@ def main() -> int:
 
             login = page.request.post(
                 f"{base}/api/auth/login",
-                json={"username": "admin", "password": "e2e-pass"},
+                headers={"Content-Type": "application/json"},
+                data=json.dumps({"username": "admin", "password": "e2e-pass"}),
             )
             assert login.ok, login.text()
             token = login.json().get("token")
@@ -57,8 +59,11 @@ def main() -> int:
 
             bm = page.request.post(
                 f"{base}/api/bookmarks",
-                headers={"Authorization": f"Bearer {token}"},
-                json={"ids": [12345]},
+                headers={
+                    "Authorization": f"Bearer {token}",
+                    "Content-Type": "application/json",
+                },
+                data=json.dumps({"ids": [12345]}),
             )
             assert bm.ok, bm.text()
 
