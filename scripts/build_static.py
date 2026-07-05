@@ -49,35 +49,82 @@ def _rewrite_static_paths(text: str, *, base_path: str = "", depth: int = 0) -> 
     return text
 
 
-_SW_CACHE = "coh-ucs-v11"
+_SW_CACHE = "coh-ucs-v12"
 
-# Service-worker cache list uses absolute /static/ paths in source.
+# Paths relative to service-worker.js (GitHub Pages / Cloudflare dist root).
 _SW_ASSETS = (
-    "/",
-    "./css/fonts.css",
-    "./css/app.css",
-    "./css/motion.css",
-    "./js/config.js",
-    "./js/router.js",
-    "./js/routeScope.js",
-    "./js/motion.js",
-    "./js/seo.js",
-    "./js/i18n.js",
-    "./js/app.js",
-    "./js/core.js",
-    "./js/features.js",
-    "./js/hero.js",
-    "./manifest.json",
-    "./icons/favicon.svg",
-    "./icons/icon-192.png",
-    "./icons/apple-touch-icon.png",
-    "./icons/og-image.png",
-    "./fonts/inter-400-latin.woff2",
-    "./fonts/inter-500-latin.woff2",
-    "./i18n/en.json",
-    "./i18n/fr.json",
-    "./i18n/ar.json",
+    "./",
+    "css/fonts.css",
+    "css/app.css",
+    "css/motion.css",
+    "js/config.js",
+    "js/router.js",
+    "js/routeScope.js",
+    "js/motion.js",
+    "js/seo.js",
+    "js/i18n.js",
+    "js/app.js",
+    "js/core.js",
+    "js/features.js",
+    "js/hero.js",
+    "manifest.json",
+    "icons/favicon.svg",
+    "icons/icon-192.png",
+    "icons/apple-touch-icon.png",
+    "icons/og-image.png",
+    "fonts/inter-400-latin.woff2",
+    "fonts/inter-500-latin.woff2",
+    "i18n/en.json",
+    "i18n/fr.json",
+    "i18n/ar.json",
 )
+
+_SW_RUNTIME = """
+function assetUrls() {
+  const base = new URL("./", self.location.href);
+  return ASSET_PATHS.map((p) => new URL(p, base).href);
+}
+function shellUrl() {
+  return new URL("./", self.location.href).href;
+}
+
+self.addEventListener("install", (e) => {
+  e.waitUntil(
+    caches.open(CACHE).then(async (cache) => {
+      const urls = assetUrls();
+      const results = await Promise.allSettled(urls.map((url) => cache.add(url)));
+      results.forEach((r, i) => {
+        if (r.status === "rejected") console.warn("SW precache skipped:", urls[i]);
+      });
+      await self.skipWaiting();
+    })
+  );
+});
+
+self.addEventListener("activate", (e) => {
+  e.waitUntil(
+    caches.keys().then((keys) =>
+      Promise.all(keys.filter((k) => k !== CACHE).map((k) => caches.delete(k)))
+    ).then(() => self.clients.claim())
+  );
+});
+
+self.addEventListener("fetch", (e) => {
+  if (!e.request.url.startsWith(self.location.origin)) return;
+  if (e.request.url.includes("/api/")) return;
+  e.respondWith(
+    caches.match(e.request).then((cached) =>
+      cached || fetch(e.request).then((res) => {
+        if (res.ok && e.request.method === "GET") {
+          const clone = res.clone();
+          caches.open(CACHE).then((c) => c.put(e.request, clone));
+        }
+        return res;
+      }).catch(() => caches.match(shellUrl()))
+    )
+  );
+});
+"""
 
 
 def _rewrite_site_url(text: str, site_url: str) -> str:
@@ -102,32 +149,8 @@ def _write_service_worker(dest: Path) -> None:
     assets = ",\n  ".join(f'"{a}"' for a in _SW_ASSETS)
     dest.write_text(
         f'const CACHE = "{_SW_CACHE}";\n'
-        f"const ASSETS = [\n  {assets},\n];\n\n"
-        f'self.addEventListener("install", (e) => {{\n'
-        f"  e.waitUntil(caches.open(CACHE).then((c) => c.addAll(ASSETS)).then(() => self.skipWaiting()));\n"
-        f"}});\n\n"
-        f'self.addEventListener("activate", (e) => {{\n'
-        f"  e.waitUntil(\n"
-        f"    caches.keys().then((keys) =>\n"
-        f"      Promise.all(keys.filter((k) => k !== CACHE).map((k) => caches.delete(k)))\n"
-        f"    ).then(() => self.clients.claim())\n"
-        f"  );\n"
-        f"}});\n\n"
-        f'self.addEventListener("fetch", (e) => {{\n'
-        f"  if (!e.request.url.startsWith(self.location.origin)) return;\n"
-        f'  if (e.request.url.includes("/api/")) return;\n'
-        f"  e.respondWith(\n"
-        f"    caches.match(e.request).then((cached) =>\n"
-        f"      cached || fetch(e.request).then((res) => {{\n"
-        f'        if (res.ok && e.request.method === "GET") {{\n'
-        f"          const clone = res.clone();\n"
-        f"          caches.open(CACHE).then((c) => c.put(e.request, clone));\n"
-        f"        }}\n"
-        f"        return res;\n"
-        f"      }}).catch(() => caches.match(\"./\"))\n"
-        f"    )\n"
-        f"  );\n"
-        f"}});\n",
+        f"const ASSET_PATHS = [\n  {assets},\n];\n"
+        f"{_SW_RUNTIME.strip()}\n",
         encoding="utf-8",
     )
 

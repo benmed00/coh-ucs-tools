@@ -57,11 +57,14 @@ class MotionStaticTests(unittest.TestCase):
         sw = SERVICE_WORKER.read_text(encoding="utf-8")
         self.assertIn("motion.css", sw)
         self.assertIn("motion.js", sw)
-        self.assertIn("routeScope.js", sw)
+        self.assertIn("Promise.allSettled", sw)
+        self.assertIn('ASSET_PATHS', sw)
 
     def test_build_static_cache_and_assets(self) -> None:
         build = BUILD_STATIC.read_text(encoding="utf-8")
-        self.assertIn("coh-ucs-v11", build)
+        self.assertIn("coh-ucs-v12", build)
+        self.assertIn("Promise.allSettled", build)
+        self.assertNotIn('"/",', build)
         self.assertIn("motion.css", build)
         self.assertIn("motion.js", build)
 

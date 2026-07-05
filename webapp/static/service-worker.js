@@ -1,5 +1,5 @@
-const CACHE = "coh-ucs-v11";
-const ASSETS = [
+const CACHE = "coh-ucs-v12";
+const ASSET_PATHS = [
   "/",
   "/static/css/fonts.css",
   "/static/css/app.css",
@@ -26,8 +26,24 @@ const ASSETS = [
   "/static/i18n/ar.json",
 ];
 
+function assetUrls() {
+  return ASSET_PATHS.map((p) => new URL(p, self.location.origin).href);
+}
+function shellUrl() {
+  return new URL("/", self.location.origin).href;
+}
+
 self.addEventListener("install", (e) => {
-  e.waitUntil(caches.open(CACHE).then((c) => c.addAll(ASSETS)).then(() => self.skipWaiting()));
+  e.waitUntil(
+    caches.open(CACHE).then(async (cache) => {
+      const urls = assetUrls();
+      const results = await Promise.allSettled(urls.map((url) => cache.add(url)));
+      results.forEach((r, i) => {
+        if (r.status === "rejected") console.warn("SW precache skipped:", urls[i]);
+      });
+      await self.skipWaiting();
+    })
+  );
 });
 
 self.addEventListener("activate", (e) => {
@@ -49,7 +65,7 @@ self.addEventListener("fetch", (e) => {
           caches.open(CACHE).then((c) => c.put(e.request, clone));
         }
         return res;
-      }).catch(() => caches.match("/"))
+      }).catch(() => caches.match(shellUrl()))
     )
   );
 });

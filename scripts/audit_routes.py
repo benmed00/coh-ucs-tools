@@ -47,7 +47,7 @@ for path in [
 
 print("\n=== SERVICE WORKER ASSETS ===")
 sw = (ROOT / "webapp/static/service-worker.js").read_text(encoding="utf-8")
-block = sw.split("ASSETS = [")[1].split("];")[0]
+block = sw.split("ASSET_PATHS = [")[1].split("];")[0]
 for a in re.findall(r'"([^"]+)"', block):
     if a == "/":
         r = client.get("/")
