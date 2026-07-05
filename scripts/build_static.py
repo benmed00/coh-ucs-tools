@@ -203,6 +203,7 @@ def build_static(out_dir: Path, api_base: str, site_url: str) -> None:
     from webapp.seo import inject_index_html
 
     _prepare_out_dir(out_dir)
+    (out_dir / ".nojekyll").touch()
 
     for name in ("css", "js", "i18n", "icons", "fonts"):
         src = STATIC_SRC / name
