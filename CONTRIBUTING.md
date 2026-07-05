@@ -1,0 +1,94 @@
+# Contributing
+
+Thanks for helping improve the CoH UCS Toolkit. This document covers dev
+setup, running tests, code style, and how to add support for another game.
+
+## Dev setup
+
+Requirements: Python 3.12+ on Windows (the toolkit is developed and tested
+on Windows; the core is OS-independent).
+
+```powershell
+git clone <your-fork> coh-ucs-tools
+cd coh-ucs-tools
+
+# optional but recommended
+python -m venv .venv
+.\.venv\Scripts\Activate.ps1
+
+# the CORE has no required dependencies; this installs the optional
+# chardet fallback and the web app stack
+pip install -r requirements.txt
+
+# on Windows, make console output unicode-safe
+$env:PYTHONIOENCODING = "utf-8"
+```
+
+## Running the tests
+
+```powershell
+python -m unittest discover -s tests -v
+```
+
+All tests must pass before you open a pull request. Tests are plain
+`unittest` — no pytest, no fixtures beyond `tempfile`. Add tests for every
+behaviour change; parser/writer changes need a round-trip test.
+
+If you touch the web app, also run its suite (when present):
+
+```powershell
+python -m unittest discover -s tests -p "test_webapp*" -v
+```
+
+## Code style
+
+* **Stdlib-only core.** `parser.py`, `validator.py`, `statistics.py`,
+  `merge.py` and `cli.py` must not gain required third-party dependencies.
+  `chardet` stays optional (import inside a `try`/`except ImportError`).
+  Only `webapp/` and `translate.py` may use external packages, declared in
+  `requirements.txt`.
+* **Dataclasses + typing.** Public data structures are `@dataclass`es
+  (frozen where value-like); all public functions carry full type hints and
+  docstrings. `from __future__ import annotations` at the top of modules.
+* **Never destroy user data.** Writers must refuse to overwrite existing
+  files unless explicitly told to (`overwrite=True`), and must never write
+  on top of an input file. Keep these guarantees in anything you add.
+* **No silent drops.** Malformed input is recorded (line number, raw text,
+  reason) and surfaced in validation/reports — never discarded.
+* **No invented translations.** Merge modes may copy text verbatim or emit
+  `<MISSING>` placeholders; machine translation is for QA comparison only
+  and must never end up in a generated game file.
+* Logging via `logging.getLogger(__name__)`, not `print` (the CLI's user
+  output is the exception).
+
+## Adding a game variant (e.g. CoH2, Dawn of War)
+
+Other Relic titles use UCS dialects that differ in key ranges and
+occasionally in conventions. To add one:
+
+1. **Capture the format first.** Obtain real files, verify encoding, BOM,
+   newline style, separator and duplicate behaviour byte-for-byte (see the
+   findings table in the README for what to check). Document the findings
+   in the PR description and in `docs/`.
+2. Put variant-specific constants (default paths, expected key ranges,
+   quirks) behind a profile — do not sprinkle `if game == ...` checks
+   through the parser. If the line grammar itself differs, extend
+   `parse_text` with a strategy rather than forking the module.
+3. Add fixture-based tests with small hand-crafted samples for the new
+   variant (never commit real game files — they are copyrighted).
+4. Update the version registry in `webapp/api.py` (`KNOWN_VERSIONS`) if the
+   variant should appear in the web app.
+
+## Copyrighted content
+
+Never commit game localization files or anything containing game text:
+`.ucs` files from an install, the recovered NSV file (`downloads/`), the MT
+cache (`downloads/mt_cache.json`), or generated merges. `.gitignore`
+already excludes these paths — do not work around it.
+
+## Commits and pull requests
+
+* Conventional commit style: `feat:`, `fix:`, `docs:`, `test:`, `refactor:`,
+  `chore:` with a concise imperative subject.
+* One logical change per PR; include the *why* in the description.
+* PRs must keep the test suite green.
