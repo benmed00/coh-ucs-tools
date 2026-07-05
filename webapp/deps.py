@@ -50,6 +50,42 @@ KNOWN_VERSIONS: list[dict] = [
     },
 ]
 
+# Optional union builds — registered at startup when present on disk.
+LOCALE_VERSIONS: list[dict] = [
+    {
+        "id": "french-complete",
+        "name": "RelicCOH.French.complete.ucs",
+        "path": Path("RelicCOH.French.complete.ucs"),
+        "origin": "Built by build_french.py",
+        "completeness": "Official French NSV union + placeholders",
+        "notes": "Requires recovered French NSV from depot 4565.",
+    },
+    {
+        "id": "german-complete",
+        "name": "RelicCOH.German.complete.ucs",
+        "path": Path("RelicCOH.German.complete.ucs"),
+        "origin": "Built by build_german.py",
+        "completeness": "Official German NSV union + placeholders",
+        "notes": "Requires recovered German NSV from depot 4564.",
+    },
+    {
+        "id": "spanish-complete",
+        "name": "RelicCOH.Spanish.complete.ucs",
+        "path": Path("RelicCOH.Spanish.complete.ucs"),
+        "origin": "Built by build_spanish.py",
+        "completeness": "Official Spanish NSV union + placeholders",
+        "notes": "Requires recovered Spanish NSV from depot 4566.",
+    },
+    {
+        "id": "arabic-mt",
+        "name": "RelicCOH.Arabic.MT.ucs",
+        "path": Path("RelicCOH.Arabic.MT.ucs"),
+        "origin": "Built by build_arabic.py (machine translation)",
+        "completeness": "Unofficial MT from English complete",
+        "notes": "Fan MT artifact — not official Relic text.",
+    },
+]
+
 EXTERNAL_TOOLS: list[dict] = [
     {
         "name": "vscode-relic-ucs",
