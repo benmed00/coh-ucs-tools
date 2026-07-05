@@ -3,7 +3,7 @@
 ![Python 3.12](https://img.shields.io/badge/python-3.12-blue)
 ![License: MIT](https://img.shields.io/badge/license-MIT-green)
 ![Tests](https://github.com/benmed00/coh-ucs-tools/actions/workflows/test.yml/badge.svg)
-![Tests local](https://img.shields.io/badge/tests-64%20passing-brightgreen)
+![Tests local](https://img.shields.io/badge/tests-83%20passing-brightgreen)
 
 Comparison, validation, search and migration tooling for Company of Heroes
 `.ucs` localization files (`RelicCOH.Russian.ucs` / `RelicCOH.English.ucs`) —
@@ -62,7 +62,7 @@ flowchart TD
     subgraph core ["Core (stdlib only)"]
         parser["parser.py<br/>UcsDocument, parse/write,<br/>encoding & BOM detection"]
         validator["validator.py<br/>duplicate/invalid/bad-char/<br/>empty/missing checks"]
-        stats["statistics.py<br/>Comparison, coverage,<br/>range compression, report/"]
+        stats["ucs_stats.py<br/>Comparison, coverage,<br/>range compression, report/"]
         merge["merge.py<br/>placeholder & fill-from-source<br/>merge, safe writing"]
     end
     cli["cli.py<br/>interactive menu +<br/>argparse subcommands"]
@@ -108,7 +108,7 @@ parser records them with line number and reason, and they surface in
 |-----------------|--------------------------------------------------------------------|
 | `parser.py`     | Encoding/BOM detection, parsing into `UcsDocument`, UCS writer     |
 | `validator.py`  | Duplicate IDs, missing IDs, empty values, UTF-16/corruption checks |
-| `statistics.py` | Comparison, coverage stats, range compression, `report/` generator |
+| `ucs_stats.py`  | Comparison, coverage stats, range compression, `report/` generator (was `statistics.py`) |
 | `merge.py`      | Merge algorithm and safe writing of the merged file                |
 | `translate.py`  | Machine translation (comparison/QA only) vs. recovered official text |
 | `cli.py`        | Interactive menu + argparse subcommands                            |

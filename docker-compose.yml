@@ -1,0 +1,17 @@
+services:
+  coh-ucs-tools:
+    build: .
+    ports:
+      - "8000:8000"
+    environment:
+      UCS_API_KEY: ${UCS_API_KEY:-}
+      SQLITE_PATH: /data/app.db
+      UCS_WEBAPP_UPLOADS: /data/uploads
+      DEEPL_API_KEY: ${DEEPL_API_KEY:-}
+      REDIS_URL: ${REDIS_URL:-}
+    volumes:
+      - ucs-data:/data
+      - ./uploads:/data/uploads
+
+volumes:
+  ucs-data:

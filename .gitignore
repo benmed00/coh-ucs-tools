@@ -12,6 +12,7 @@ mt_run.log
 
 # webapp runtime storage
 webapp/storage/
+webapp/data/
 
 # python
 __pycache__/
