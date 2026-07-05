@@ -41,7 +41,8 @@ export function fmt(n) { return Number(n).toLocaleString("en-US"); }
 
 export function fileLabel(f) {
   const tag = { upload: "UPL", version: "VER", generated: "GEN" }[f.kind] || "?";
-  return `[${tag}] ${f.name} — ${fmt(f.keys)} keys`;
+  const prof = f.detected_profile ? ` · ${f.detected_profile}` : "";
+  return `[${tag}] ${f.name} — ${fmt(f.keys)} keys${prof}`;
 }
 
 export async function loadFiles() {

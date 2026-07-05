@@ -24,6 +24,8 @@ class FileSummary(BaseModel):
     newline: str = Field(description="Detected line ending convention", examples=["CRLF"])
     min_key: Optional[int] = Field(default=None, description="Smallest numeric id")
     max_key: Optional[int] = Field(default=None, description="Largest numeric id")
+    detected_profile: Optional[str] = Field(default=None, description="Heuristic game-variant id at upload time")
+    profile_confidence: Optional[float] = Field(default=None, description="Classification confidence 0–1")
 
 
 class FileListResponse(BaseModel):

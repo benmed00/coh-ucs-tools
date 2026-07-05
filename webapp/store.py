@@ -54,6 +54,8 @@ class StoredFile:
     completeness: str = ""
     notes: str = ""
     project_id: str = ""
+    detected_profile: str = ""
+    profile_confidence: float = 0.0
 
     def to_dict(self) -> dict:
         return asdict(self)
@@ -99,6 +101,8 @@ class FileStore:
                 min_key=row["min_key"], max_key=row["max_key"],
                 origin=row["origin"] or "", completeness=row["completeness"] or "",
                 notes=row["notes"] or "", project_id=row["project_id"] or "",
+                detected_profile=row["detected_profile"] or "" if "detected_profile" in row.keys() else "",
+                profile_confidence=float(row["profile_confidence"] or 0) if "profile_confidence" in row.keys() else 0.0,
             )
             if Path(rec.stored_path).exists():
                 self._records[rec.id] = rec
@@ -111,14 +115,15 @@ class FileStore:
             """INSERT OR REPLACE INTO uploads
             (id, name, kind, stored_path, size, created_at, keys, duplicates,
              invalid_lines, empty_values, encoding, has_bom, newline,
-             min_key, max_key, origin, completeness, notes, project_id)
-            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+             min_key, max_key, origin, completeness, notes, project_id,
+             detected_profile, profile_confidence)
+            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
             (
                 rec.id, rec.name, rec.kind, rec.stored_path, rec.size, rec.created_at,
                 rec.keys, rec.duplicates, rec.invalid_lines, rec.empty_values,
                 rec.encoding, 1 if rec.has_bom else 0, rec.newline,
                 rec.min_key, rec.max_key, rec.origin, rec.completeness,
-                rec.notes, rec.project_id,
+                rec.notes, rec.project_id, rec.detected_profile, rec.profile_confidence,
             ),
         )
 
@@ -160,6 +165,13 @@ class FileStore:
             rec.min_key = min(doc.entries)
             rec.max_key = max(doc.entries)
 
+    @staticmethod
+    def _apply_classification(rec: StoredFile, doc: UcsDocument) -> None:
+        from game_profiles import classify_document
+        clf = classify_document(doc)
+        rec.detected_profile = clf["best_match"]
+        rec.profile_confidence = float(clf["confidence"])
+
     # ------------------------------------------------------------- mutation
     def add_upload(self, filename: str, raw: bytes) -> StoredFile:
         """Store an uploaded file, parse it, and index the summary."""
@@ -174,6 +186,7 @@ class FileStore:
             stored_path=str(stored), size=len(raw), created_at=time.time(),
         )
         self._summarize(rec, doc)
+        self._apply_classification(rec, doc)
         with self._lock:
             self._records[file_id] = rec
             self._docs[file_id] = doc
@@ -208,6 +221,7 @@ class FileStore:
                 completeness=completeness, notes=notes,
             )
             self._summarize(rec, doc)
+            self._apply_classification(rec, doc)
             with self._lock:
                 self._records[version_id] = rec
                 self._docs[version_id] = doc
@@ -227,6 +241,7 @@ class FileStore:
             stored_path=str(path), size=path.stat().st_size, created_at=time.time(),
         )
         self._summarize(rec, doc)
+        self._apply_classification(rec, doc)
         with self._lock:
             self._records[file_id] = rec
             self._docs[file_id] = doc

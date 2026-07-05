@@ -25,12 +25,21 @@ P1 and P2 items are complete. P3 items are mostly complete or partial.
 | Profile strict on compare/merge | `game_profile` + `strict_profile` on compare, merge, preview, batch compare; UI profile bar |
 | SEO sitemap test stability | About-page priority asserted in URL chunk, not global sitemap |
 
+## Wave 9 (completed)
+
+| Item | Deliverable |
+|---|---|
+| Profile metadata on uploads | `detected_profile` + `profile_confidence` on `StoredFile`/SQLite; shown in file list |
+| Webhook retry / dead letter | 3-attempt backoff in `fire_webhooks`; `dead_letter` flag; `POST /api/webhooks/retry-dead-letters` |
+| SGA inject from editor | Inject panel after editor save when SGA context in sessionStorage |
+| OAuth/session expiry UX | `session_expires_in_s` on `/api/auth/status`; warnings in Settings |
+
 ## Suggested next wave
 
 | Item | Notes |
 |---|---|
 | Real CoH2 UCS samples | Replace synthetic fixtures when sample files available |
-| Webhook retry / dead-letter queue | Re-attempt failed deliveries with backoff |
-| SGA inject from editor | One-click inject after save in entry editor |
-| Profile metadata on file records | Persist detected profile on upload for faster list views |
-| OAuth token refresh UX | Surface expiry and re-login in settings |
+| Backfill profile metadata | CLI to classify existing uploads in SQLite |
+| Webhook HMAC signatures | Sign outbound webhook payloads |
+| Profile filter on file list | UI filter by detected_profile |
+| Scheduled dead-letter retry | Background job or cron endpoint |

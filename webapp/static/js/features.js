@@ -864,6 +864,7 @@ export async function renderEditor(params) {
     <label class="field">File<select id="ed-file"><option value="">—</option>${fileOptions(files, fid)}</select></label>
     <div id="monaco" style="height:420px;border:1px solid var(--border);margin:12px 0"></div>
     <button class="btn" id="ed-save">Save as new upload</button>
+    <div id="ed-sga" style="margin-top:12px"></div>
     <div id="ed-lint" class="banner" style="margin-top:12px"></div>`;
   const loadMonaco = () => new Promise((resolve) => {
     if (window.monaco) return resolve();
@@ -891,6 +892,33 @@ export async function renderEditor(params) {
       `${lint.entries_with_issues} entries with issues · ${lint.token_issue_count} token issues`;
   }
   document.getElementById("ed-file").onchange = e => loadFile(e.target.value);
+  function showSgaInject(fileId) {
+    const box = document.getElementById("ed-sga");
+    let sga = null;
+    try { sga = JSON.parse(sessionStorage.getItem("coh-sga-inject") || "null"); } catch { /* ignore */ }
+    if (!sga?.arch) { box.innerHTML = ""; return; }
+    box.innerHTML = `
+      <div class="card">
+        <h3 style="font-size:14px;margin:0 0 8px">Inject into SGA</h3>
+        <p class="section-sub">${esc(sga.internal)} in ${esc(sga.arch.split(/[/\\\\]/).pop())}</p>
+        <button class="btn small" id="ed-inject">Inject saved UCS into archive</button>
+        <div id="ed-inject-out"></div>
+      </div>`;
+    document.getElementById("ed-inject").onclick = async () => {
+      const out = document.getElementById("ed-inject-out");
+      out.innerHTML = `<div class="loading">Packing SGA</div>`;
+      try {
+        const r = await api(`/api/sga/${encodeURIComponent(sga.arch)}/inject-ucs`, {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ internal_path: sga.internal, ucs_id: fileId }),
+        });
+        out.innerHTML = `<div class="banner"><a href="${r.download_url}">Download patched SGA</a></div>`;
+        toast("SGA packed");
+      } catch (err) {
+        out.innerHTML = `<div class="banner error">${esc(err.message)}</div>`;
+      }
+    };
+  }
   document.getElementById("ed-save").onclick = async () => {
     const id = document.getElementById("ed-file").value;
     if (!id || !editor) { toast("Load a file first"); return; }
@@ -900,8 +928,14 @@ export async function renderEditor(params) {
     }).filter(Boolean);
     const r = await api(`/api/files/${id}/save`, { method: "POST", body: JSON.stringify({ entries }) });
     toast(`Saved as ${r.file_id}`);
+    try {
+      const cur = JSON.parse(sessionStorage.getItem("coh-sga-inject") || "null");
+      if (cur) sessionStorage.setItem("coh-sga-inject", JSON.stringify({ ...cur, file_id: r.file_id }));
+    } catch { /* ignore */ }
+    showSgaInject(r.file_id);
   };
   if (fid) await loadFile(fid);
+  showSgaInject(fid);
 }
 
 /* --------------------------------------------------------------- settings */
@@ -910,12 +944,28 @@ export async function renderSettings() {
   const lang = localStorage.getItem("coh-ui-lang") || "en";
   let auth = { auth_enabled: false, authenticated: false };
   try { auth = await api("/api/auth/status"); } catch { /* offline */ }
+  const sessionHint = () => {
+    if (auth.session_expired) {
+      return `<p class="bad" style="font-size:13px">Session expired — sign in again to upload or merge.</p>`;
+    }
+    if (auth.session_expires_in_s != null && auth.session_expires_in_s < 3600 && auth.authenticated) {
+      const mins = Math.ceil(auth.session_expires_in_s / 60);
+      return `<p class="muted" style="font-size:13px">Session expires in ~${mins} min — re-login soon to avoid interruption.</p>`;
+    }
+    if (auth.session_expires_in_s != null && auth.authenticated) {
+      const hrs = Math.floor(auth.session_expires_in_s / 3600);
+      const mins = Math.ceil((auth.session_expires_in_s % 3600) / 60);
+      return `<p class="muted" style="font-size:13px">Session valid for ${hrs ? `${hrs}h ` : ""}${mins}m.</p>`;
+    }
+    return "";
+  };
   document.getElementById("view").innerHTML = `
     <h2 class="section-title">SETTINGS</h2>
     <div class="card" style="max-width:480px;margin-bottom:16px">
       <h3 style="font-size:14px;margin:0 0 10px">Authentication</h3>
       ${auth.authenticated
         ? `<p>Signed in as <strong>${esc(auth.user || "")}</strong> (${esc(auth.method || "")})</p>
+           ${sessionHint()}
            <button class="btn ghost small" id="auth-logout">Sign out</button>`
         : auth.auth_enabled
           ? `<p class="muted" style="font-size:13px">Server requires login or API key for uploads and merges.</p>
@@ -940,22 +990,34 @@ export async function renderSettings() {
     </div>
     <div class="card" style="max-width:720px;margin-top:16px">
       <h3 style="font-size:14px;margin:0 0 10px">Webhook delivery log</h3>
+      <button class="btn ghost small" id="wh-retry" style="margin-bottom:8px">Retry dead letters</button>
       <div id="wh-log"><div class="loading">Loading</div></div>
     </div>`;
-  try {
-    const wh = await api("/api/webhooks/deliveries?limit=25");
-    const rows = wh.deliveries || [];
-    document.getElementById("wh-log").innerHTML = rows.length ? `
-      <div class="table-wrap"><table class="data"><thead><tr><th>event</th><th>url</th><th>ok</th><th>detail</th></tr></thead>
-      <tbody>${rows.map(d => `<tr>
-        <td>${esc(d.event)}</td><td style="font-size:11px;max-width:200px;overflow:hidden;text-overflow:ellipsis">${esc(d.url)}</td>
-        <td class="${d.success ? "good" : "bad"}">${d.success ? "yes" : "no"}</td>
-        <td style="font-size:11px">${d.success ? esc(String(d.status_code || "")) : esc(d.error || "")}</td>
-      </tr>`).join("")}</tbody></table></div>`
-      : `<p class="muted">No webhook deliveries yet.</p>`;
-  } catch {
-    document.getElementById("wh-log").innerHTML = `<p class="muted">Webhook log unavailable offline.</p>`;
-  }
+  const renderWhLog = async () => {
+    try {
+      const wh = await api("/api/webhooks/deliveries?limit=25");
+      const rows = wh.deliveries || [];
+      document.getElementById("wh-log").innerHTML = rows.length ? `
+        <div class="table-wrap"><table class="data"><thead><tr><th>event</th><th>url</th><th>ok</th><th>try</th><th>detail</th></tr></thead>
+        <tbody>${rows.map(d => `<tr>
+          <td>${esc(d.event)}</td><td style="font-size:11px;max-width:200px;overflow:hidden;text-overflow:ellipsis">${esc(d.url)}</td>
+          <td class="${d.success ? "good" : "bad"}">${d.success ? "yes" : "no"}</td>
+          <td>${d.attempt || 1}${d.dead_letter ? " DL" : ""}</td>
+          <td style="font-size:11px">${d.success ? esc(String(d.status_code || "")) : esc(d.error || "")}</td>
+        </tr>`).join("")}</tbody></table></div>`
+        : `<p class="muted">No webhook deliveries yet.</p>`;
+    } catch {
+      document.getElementById("wh-log").innerHTML = `<p class="muted">Webhook log unavailable offline.</p>`;
+    }
+  };
+  await renderWhLog();
+  document.getElementById("wh-retry")?.addEventListener("click", async () => {
+    try {
+      const r = await api("/api/webhooks/retry-dead-letters", { method: "POST" });
+      toast(`Retried ${r.retried}: ${r.succeeded} ok, ${r.failed} failed`);
+      await renderWhLog();
+    } catch (e) { toast(e.message); }
+  });
   const loginBtn = document.getElementById("auth-login");
   if (loginBtn) {
     loginBtn.onclick = async () => {

@@ -1314,7 +1314,8 @@ def list_webhooks() -> dict:
 def list_webhook_deliveries(limit: int = Query(50, ge=1, le=500)) -> dict:
     from .db import get_db
     rows = get_db().fetchall(
-        """SELECT id, event, url, success, status_code, error, payload_json, created_at
+        """SELECT id, event, url, success, status_code, error, payload_json,
+                  attempt, dead_letter, created_at
            FROM webhook_deliveries ORDER BY created_at DESC LIMIT ?""",
         (limit,),
     )
@@ -1327,10 +1328,17 @@ def list_webhook_deliveries(limit: int = Query(50, ge=1, le=500)) -> dict:
             "success": bool(row["success"]),
             "status_code": row["status_code"],
             "error": row["error"] or "",
+            "attempt": row["attempt"] if "attempt" in row.keys() else 1,
+            "dead_letter": bool(row["dead_letter"]) if "dead_letter" in row.keys() else False,
             "payload": json.loads(row["payload_json"] or "{}"),
             "created_at": row["created_at"],
         })
     return {"deliveries": deliveries}
+
+
+@ext_router.post("/webhooks/retry-dead-letters", tags=["meta"], summary="Retry failed webhook deliveries")
+def retry_webhook_dead_letters(limit: int = Query(20, ge=1, le=100)) -> dict:
+    return services.retry_dead_letter_webhooks(limit=limit)
 
 
 @ext_router.get("/projects", tags=["meta"], summary="List workspaces/projects")

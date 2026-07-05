@@ -36,7 +36,9 @@ CREATE TABLE IF NOT EXISTS uploads (
     origin TEXT DEFAULT '',
     completeness TEXT DEFAULT '',
     notes TEXT DEFAULT '',
-    project_id TEXT
+    project_id TEXT,
+    detected_profile TEXT DEFAULT '',
+    profile_confidence REAL DEFAULT 0
 );
 
 CREATE TABLE IF NOT EXISTS projects (
@@ -104,6 +106,8 @@ CREATE TABLE IF NOT EXISTS webhook_deliveries (
     status_code INTEGER,
     error TEXT DEFAULT '',
     payload_json TEXT DEFAULT '{}',
+    attempt INTEGER DEFAULT 1,
+    dead_letter INTEGER DEFAULT 0,
     created_at REAL NOT NULL
 );
 
@@ -253,26 +257,43 @@ class Database:
                 logger.warning("Upload index migration skipped: %s", exc)
 
     def _apply_schema_migrations(self) -> None:
-        """Idempotent upgrades for databases created before new tables were added."""
-        if self.fetchone(
+        """Idempotent upgrades for databases created before new tables/columns were added."""
+        upload_cols = {
+            row["name"] for row in self.fetchall("PRAGMA table_info(uploads)")
+        }
+        if "detected_profile" not in upload_cols:
+            self.execute("ALTER TABLE uploads ADD COLUMN detected_profile TEXT DEFAULT ''")
+            self.execute("ALTER TABLE uploads ADD COLUMN profile_confidence REAL DEFAULT 0")
+            logger.info("Added uploads profile classification columns")
+
+        if not self.fetchone(
             "SELECT name FROM sqlite_master WHERE type='table' AND name='webhook_deliveries'"
         ):
-            return
-        with self.cursor() as cur:
-            cur.executescript("""
-                CREATE TABLE webhook_deliveries (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    event TEXT NOT NULL,
-                    url TEXT NOT NULL,
-                    success INTEGER NOT NULL,
-                    status_code INTEGER,
-                    error TEXT DEFAULT '',
-                    payload_json TEXT DEFAULT '{}',
-                    created_at REAL NOT NULL
-                );
-                CREATE INDEX IF NOT EXISTS idx_webhook_deliveries_ts ON webhook_deliveries(created_at);
-            """)
-        logger.info("Applied webhook_deliveries schema migration")
+            with self.cursor() as cur:
+                cur.executescript("""
+                    CREATE TABLE webhook_deliveries (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        event TEXT NOT NULL,
+                        url TEXT NOT NULL,
+                        success INTEGER NOT NULL,
+                        status_code INTEGER,
+                        error TEXT DEFAULT '',
+                        payload_json TEXT DEFAULT '{}',
+                        attempt INTEGER DEFAULT 1,
+                        dead_letter INTEGER DEFAULT 0,
+                        created_at REAL NOT NULL
+                    );
+                    CREATE INDEX IF NOT EXISTS idx_webhook_deliveries_ts ON webhook_deliveries(created_at);
+                """)
+            logger.info("Applied webhook_deliveries schema migration")
+        else:
+            wh_cols = {
+                row["name"] for row in self.fetchall("PRAGMA table_info(webhook_deliveries)")
+            }
+            if "attempt" not in wh_cols:
+                self.execute("ALTER TABLE webhook_deliveries ADD COLUMN attempt INTEGER DEFAULT 1")
+                self.execute("ALTER TABLE webhook_deliveries ADD COLUMN dead_letter INTEGER DEFAULT 0")
+                logger.info("Added webhook_deliveries retry columns")
 
     def close(self) -> None:
         self._conn.close()

@@ -70,7 +70,8 @@ def create_session_token(sub: str, *, ttl_s: int = SESSION_TTL_S) -> str:
     return f"{body}.{_b64url(sig)}"
 
 
-def verify_session_token(token: str) -> dict[str, Any] | None:
+def peek_session_token(token: str) -> dict[str, Any] | None:
+    """Decode a session token without enforcing expiry (for status display)."""
     secret = _session_secret()
     if not secret or "." not in token:
         return None
@@ -79,8 +80,31 @@ def verify_session_token(token: str) -> dict[str, Any] | None:
     try:
         if not hmac.compare_digest(_b64url(expected), sig):
             return None
-        payload = json.loads(_b64url_decode(body))
+        return json.loads(_b64url_decode(body))
     except (ValueError, json.JSONDecodeError):
+        return None
+
+
+def session_cookie_info(request: Request) -> dict[str, Any]:
+    """Expiry metadata for the session cookie, if present."""
+    token = request.cookies.get(SESSION_COOKIE)
+    if not token:
+        return {}
+    payload = peek_session_token(token)
+    if not payload:
+        return {"session_invalid": True}
+    exp = int(payload.get("exp", 0))
+    now = int(time.time())
+    return {
+        "session_expires_at": exp,
+        "session_expires_in_s": max(0, exp - now),
+        "session_expired": exp < now,
+    }
+
+
+def verify_session_token(token: str) -> dict[str, Any] | None:
+    payload = peek_session_token(token)
+    if not payload:
         return None
     if payload.get("exp", 0) < time.time():
         return None

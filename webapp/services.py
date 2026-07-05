@@ -255,11 +255,52 @@ def batch_zip_path(job_id: str) -> Optional[Path]:
     return p if p.exists() else None
 
 
+WEBHOOK_RETRY_BACKOFF_S = (0.0, 0.5, 1.5)
+
+
+def _post_webhook(url: str, body: bytes) -> tuple[bool, int | None, str]:
+    import urllib.request
+    req = urllib.request.Request(
+        url, data=body, method="POST",
+        headers={"Content-Type": "application/json"},
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=5) as resp:
+            code = getattr(resp, "status", None) or resp.getcode()
+            return True, code, ""
+    except Exception as exc:
+        return False, None, str(exc)
+
+
+def _log_webhook_delivery(
+    *,
+    event: str,
+    url: str,
+    success: bool,
+    status_code: int | None,
+    error: str,
+    payload: dict,
+    attempt: int,
+    dead_letter: bool,
+    created_at: float | None = None,
+) -> None:
+    from .db import get_db
+    get_db().execute(
+        """INSERT INTO webhook_deliveries
+        (event, url, success, status_code, error, payload_json, attempt, dead_letter, created_at)
+        VALUES (?,?,?,?,?,?,?,?,?)""",
+        (
+            event, url, 1 if success else 0, status_code, error,
+            json.dumps(payload), attempt, 1 if dead_letter else 0,
+            created_at or time.time(),
+        ),
+    )
+
+
 def fire_webhooks(event: str, payload: dict) -> list[str]:
     """Fire registered webhooks (metadata only, no string content). Returns URLs attempted."""
     fired: list[str] = []
     try:
-        import urllib.request
         from .db import get_db
         rows = get_db().fetchall("SELECT url, events FROM webhooks")
         now = time.time()
@@ -269,35 +310,55 @@ def fire_webhooks(event: str, payload: dict) -> list[str]:
                 continue
             fired.append(row["url"])
             body = json.dumps({"event": event, **payload}).encode()
-            req = urllib.request.Request(
-                row["url"], data=body, method="POST",
-                headers={"Content-Type": "application/json"},
-            )
+            success = False
             status_code: int | None = None
             error = ""
-            success = False
+            attempts = 0
+            for delay in WEBHOOK_RETRY_BACKOFF_S:
+                if delay:
+                    time.sleep(delay)
+                attempts += 1
+                success, status_code, error = _post_webhook(row["url"], body)
+                if success:
+                    break
+            if not success:
+                logger.warning("Webhook %s failed after %d attempt(s): %s", row["url"], attempts, error)
             try:
-                with urllib.request.urlopen(req, timeout=5) as resp:
-                    status_code = getattr(resp, "status", None) or resp.getcode()
-                    success = True
-            except Exception as exc:
-                error = str(exc)
-                logger.warning("Webhook %s failed: %s", row["url"], exc)
-            try:
-                get_db().execute(
-                    """INSERT INTO webhook_deliveries
-                    (event, url, success, status_code, error, payload_json, created_at)
-                    VALUES (?,?,?,?,?,?,?)""",
-                    (
-                        event, row["url"], 1 if success else 0, status_code, error,
-                        json.dumps(payload), now,
-                    ),
+                _log_webhook_delivery(
+                    event=event, url=row["url"], success=success,
+                    status_code=status_code, error=error, payload=payload,
+                    attempt=attempts, dead_letter=not success, created_at=now,
                 )
             except Exception as log_exc:
                 logger.warning("Webhook delivery log failed: %s", log_exc)
     except Exception:
         pass
     return fired
+
+
+def retry_dead_letter_webhooks(*, limit: int = 20) -> dict:
+    """Re-attempt webhook deliveries marked dead-letter. Returns summary counts."""
+    from .db import get_db
+    rows = get_db().fetchall(
+        """SELECT id, event, url, payload_json FROM webhook_deliveries
+           WHERE dead_letter = 1 ORDER BY created_at DESC LIMIT ?""",
+        (limit,),
+    )
+    retried = succeeded = 0
+    for row in rows:
+        payload = json.loads(row["payload_json"] or "{}")
+        body = json.dumps({"event": row["event"], **payload}).encode()
+        success, status_code, error = _post_webhook(row["url"], body)
+        retried += 1
+        if success:
+            succeeded += 1
+            get_db().execute("UPDATE webhook_deliveries SET dead_letter = 0 WHERE id = ?", (row["id"],))
+        _log_webhook_delivery(
+            event=row["event"], url=row["url"], success=success,
+            status_code=status_code, error=error, payload=payload,
+            attempt=1, dead_letter=not success,
+        )
+    return {"retried": retried, "succeeded": succeeded, "failed": retried - succeeded}
 
 
 def cleanup_old_uploads(store, max_age_hours: float = 24) -> int:

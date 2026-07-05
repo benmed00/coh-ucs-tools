@@ -15,6 +15,7 @@ from .auth import (
     oauth_authorize_url,
     oauth_configured,
     oauth_exchange_code,
+    session_cookie_info,
     set_session_cookie,
 )
 
@@ -35,13 +36,15 @@ class LoginResponse(BaseModel):
 @auth_router.get("/status")
 def auth_status(request: Request) -> dict:
     user = authenticate_request(request)
-    return {
+    info = {
         "auth_enabled": auth_enabled(),
         "oauth_configured": oauth_configured(),
         "authenticated": user is not None,
         "user": user.sub if user else None,
         "method": user.method if user else None,
     }
+    info.update(session_cookie_info(request))
+    return info
 
 
 @auth_router.post("/login", response_model=LoginResponse)
