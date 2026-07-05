@@ -1,7 +1,7 @@
 /* CoH UCS Tools — SPA (hash routing, no build step). */
 
 import {
-  view, toast, api, esc, fmt, loadFiles, fileOptions, UCS_FACTS,
+  view, toast, api, apiUrl, esc, fmt, loadFiles, fileOptions, UCS_FACTS,
   destroyCharts, makeChart, CHART_COLORS, exportChartPng,
 } from "./core.js";
 import {
@@ -9,6 +9,8 @@ import {
   renderMergeWizard, renderInstall, renderMtLab, renderGlossary,
   renderTimeline, renderDepots, renderSearch, renderBookmarks,
   renderPatch, renderSga, renderSettings, renderEditor,
+  renderVerify, renderTranslation,
+  renderCampaigns, renderGames,
 } from "./features.js";
 
 initTheme();
@@ -49,7 +51,7 @@ async function renderDashboard() {
         <tbody>${files.map(f => `
           <tr><td>${f.kind}</td><td class="val">${esc(f.name)}</td><td class="num">${fmt(f.keys)}</td>
             <td>${f.duplicates}</td><td>${f.invalid_lines}</td>
-            <td><a href="#/upload?file=${f.id}">analyze</a> · <a href="/api/downloads/${f.id}">dl</a>
+            <td><a href="#/upload?file=${f.id}">analyze</a> · <a href="${apiUrl(`/api/downloads/${f.id}`)}">dl</a>
             ${f.kind !== "version" ? ` · <a href="#" data-del="${f.id}" style="color:var(--red)">del</a>` : ""}</td></tr>`).join("")}
         </tbody></table></div>`}
   `;
@@ -236,7 +238,7 @@ async function renderTools() {
       <div class="card tool-card"><span class="cat">${esc(t.category)}</span>
         <h3><a href="${esc(t.url)}" target="_blank">${esc(t.name)}</a></h3><p>${esc(t.description)}</p></div>`).join("")}
     </div>
-    <p style="margin-top:20px"><a href="#/depots">Depots &amp; sources</a> · <a href="/docs" target="_blank">API docs</a></p>`;
+    <p style="margin-top:20px"><a href="#/depots">Depots &amp; sources</a> · <a href="${apiUrl("/docs")}" target="_blank">API docs</a></p>`;
 }
 
 /* --------------------------------------------------------------- router */
@@ -262,6 +264,10 @@ const routes = {
   sga: renderSga,
   settings: renderSettings,
   editor: renderEditor,
+  verify: renderVerify,
+  translation: renderTranslation,
+  campaigns: renderCampaigns,
+  games: renderGames,
 };
 
 async function route() {

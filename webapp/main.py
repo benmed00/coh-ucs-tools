@@ -16,11 +16,12 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 
 from fastapi import FastAPI, Request
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
 from .api import router
-from .deps import KNOWN_VERSIONS
+from .deps import KNOWN_VERSIONS, LOCALE_VERSIONS
 from . import services
 from .store import FileStore
 
@@ -29,6 +30,26 @@ logging.basicConfig(level=logging.INFO,
 logger = logging.getLogger(__name__)
 
 STATIC_DIR = Path(__file__).parent / "static"
+
+DEFAULT_CORS_ORIGINS = [
+    "https://coh-ucs-tools.fly.dev",
+    "https://coh-ucs-tools.pages.dev",
+    "https://benmed00.github.io",
+    "http://127.0.0.1:8000",
+    "http://localhost:8000",
+]
+
+
+def cors_origins() -> list[str]:
+    """Return allowed CORS origins; ``CORS_ORIGINS`` adds comma-separated extras."""
+    extra = os.environ.get("CORS_ORIGINS", "")
+    origins = list(DEFAULT_CORS_ORIGINS)
+    if extra:
+        for item in extra.split(","):
+            origin = item.strip()
+            if origin and origin not in origins:
+                origins.append(origin)
+    return origins
 
 DESCRIPTION = """
 **Company of Heroes 1 `.ucs` localization toolkit — as a web service.**
@@ -80,6 +101,13 @@ async def lifespan(app: FastAPI):
             origin=meta["origin"], completeness=meta["completeness"],
             notes=meta["notes"],
         )
+    for meta in LOCALE_VERSIONS:
+        if meta["path"].exists():
+            store.register_version(
+                meta["id"], meta["name"], meta["path"],
+                origin=meta["origin"], completeness=meta["completeness"],
+                notes=meta["notes"],
+            )
     removed = services.cleanup_old_uploads(store, max_age_hours=24)
     if removed:
         logger.info("Startup cleanup removed %d stale upload(s)", removed)
@@ -100,6 +128,13 @@ app = FastAPI(
 
 app.include_router(router)
 
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=cors_origins(),
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["X-API-Key", "Content-Type", "Authorization"],
+)
 
 @app.middleware("http")
 async def optional_api_key_and_rate_limit(request: Request, call_next):

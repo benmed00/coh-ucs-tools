@@ -1,5 +1,6 @@
 # generated outputs
 report/
+dist/
 *.merged.ucs
 uploads/
 *.complete.ucs

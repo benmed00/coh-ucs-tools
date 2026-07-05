@@ -45,6 +45,9 @@ cd coh-ucs-tools
 # chardet fallback and the web app stack
 pip install -r requirements.txt
 
+# or install as a package (console entry point: coh-ucs)
+pip install .
+
 # interactive menu (defaults to the two game paths baked into cli.py)
 python cli.py
 
@@ -193,13 +196,16 @@ python cli.py validate
 python cli.py search-id 559200
 python cli.py search-text "Panzer"
 python cli.py search-text "Pz\.? ?IV" --regex
+python cli.py verify-checklist              # QA checklist on --english file
+python cli.py verify-checklist path.ucs     # QA checklist on any UCS
 ```
 
 Interactive menu:
 
 ```
 1 Compare   2 Statistics   3 Export missing IDs   4 Merge
-5 Validate  6 Search ID    7 Search Text          8 Exit
+5 Validate  6 Search ID    7 Search Text          8 Verify checklist
+9 Exit
 ```
 
 In menu option 7, prefix the query with `re:` to search by regular
@@ -207,11 +213,17 @@ expression; otherwise a case-insensitive substring search is used.
 
 ## Web application
 
-**Live demo:** <https://coh-ucs-tools-benmed00.fly.dev> (Fly.io, Paris `cdg`).
+**Live API:** <https://coh-ucs-tools.fly.dev> (Fly.io, `iad`).
+
+**Live UI (static frontend):** <https://benmed00.github.io/coh-ucs-tools/> — deployed
+from `master` via GitHub Actions (see [Hybrid deployment](#hybrid-deployment-phase-1)
+in [`docs/DEPLOY.md`](docs/DEPLOY.md)). First deploy requires enabling Pages in repo
+Settings → Pages → Source: **GitHub Actions**.
+
 Deploy your own copy: [`docs/DEPLOY.md`](docs/DEPLOY.md).
 
 The `webapp/` package serves the toolkit as a REST API plus a static
-single-page frontend:
+single-page frontend. **Locally**, one process serves both (monolith):
 
 ```powershell
 pip install -r requirements.txt
@@ -223,7 +235,8 @@ Then open <http://127.0.0.1:8000> — dark WW2 command-console theme with
 Three.js locale globe (click pins → Languages hub), Chart.js coverage donuts.
 
 **SPA sections:** Dashboard · Upload & Analyze · Compare · **Diff** ·
-**Ranges heatmap** · **Validator** · **Languages hub** · **Merge wizard**
+**Ranges heatmap** · **Validator** · **Verify checklist** · **PO/TMX** ·
+**Languages hub** · **Merge wizard**
 (preview) · Install detect · **MT lab** · **Glossary** · **Timeline** ·
 **Depots & Sources** · **Global search** (fuzzy/regex) · **Bookmarks** ·
 **Patch builder** · **SGA browser** · Settings · Tools
@@ -308,6 +321,28 @@ Outputs (gitignored when they contain game text):
 
 THQ retail path: `Engine\Locale\French\RelicCOH.French.ucs`. Complete Edition
 path: `CoH\Engine\Locale\French\RelicCOH.French.ucs`.
+
+## German localization
+
+Same pipeline as French — official German NSV from Steam depot **4564**::
+
+```powershell
+python build_german.py --search-only
+python build_german.py --nsv "D:\path\RelicCOH.German.ucs"
+```
+
+Outputs: `RelicCOH.German.complete.ucs`, `report/german/`.
+
+## Spanish localization
+
+Official Spanish NSV from Steam depot **4566**::
+
+```powershell
+python build_spanish.py --search-only
+python build_spanish.py --nsv "D:\path\RelicCOH.Spanish.ucs"
+```
+
+Outputs: `RelicCOH.Spanish.complete.ucs`, `report/spanish/`.
 
 ## Machine translation cross-check (`translate.py`)
 
@@ -404,14 +439,16 @@ Coverage is computed against the union of both key sets.
 python -m unittest discover -s tests -v
 ```
 
-45 tests: 36 cover the core toolkit and `build_french.py` — parsing (BOM, encodings, tabs in
+45 tests: 36 cover the core toolkit and locale builders — parsing (BOM, encodings, tabs in
 values, duplicates, invalid lines), writing (round-trip, overwrite
 protection), validation (all issue codes), range compression, comparison
 statistics, merge behaviour (placeholders only, numeric sorting,
-original-file protection), numeric key sorting, and MT token preservation
-(`protect_tokens` / `restore_tokens`). 9 more
+original-file protection), numeric key sorting, MT token preservation
+(`protect_tokens` / `restore_tokens`), verification checklist, locale builds,
+PO/TMX round-trip. 9 more
 (`tests/test_webapp.py`, FastAPI TestClient) cover the REST API happy path
-(upload → analyze → compare → merge → download) and its error cases.
+(upload → analyze → compare → merge → download) and its error cases. Extended
+webapp tests cover diff, verify, TMX, bookmarks, and more.
 
 ## Documentation
 

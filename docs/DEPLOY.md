@@ -106,6 +106,7 @@ Free Render web services have **ephemeral disk** — SQLite and uploads are lost
 | `SQLITE_PATH` | `webapp/data/app.db` | SQLite database |
 | `UCS_WEBAPP_UPLOADS` | `uploads/` | UCS byte storage |
 | `UCS_API_KEY` | (none) | Require `X-API-Key` header when set |
+| `CORS_ORIGINS` | (see below) | Comma-separated extra allowed browser origins |
 | `DEEPL_API_KEY` | (none) | DeepL backend for MT lab |
 | `REDIS_URL` | (none) | Documented stub; in-memory rate limit fallback |
 
@@ -118,3 +119,86 @@ GET /api/health
 ```
 
 Returns `{"status":"ok", ...}` — used by Fly.io and Docker orchestrators.
+
+---
+
+## Hybrid deployment (Phase 1)
+
+Split the **static UI** (CDN) from the **API** (Fly.io). The SPA calls
+`https://coh-ucs-tools.fly.dev` via `window.API_BASE` in `js/config.js`;
+locally `API_BASE` is empty so the monolith keeps working.
+
+| Layer | Host | URL |
+|-------|------|-----|
+| API | Fly.io | https://coh-ucs-tools.fly.dev |
+| UI (GitHub Pages) | GitHub Actions | https://benmed00.github.io/coh-ucs-tools/ |
+| UI (Cloudflare Pages, optional) | Cloudflare | https://coh-ucs-tools.pages.dev (custom domain possible) |
+
+### Build static frontend
+
+```powershell
+python scripts/build_static.py
+# → dist/index.html, dist/css/, dist/js/config.js (production API_BASE), …
+```
+
+Options:
+
+- `--api-base https://coh-ucs-tools.fly.dev` — API origin (default)
+- `--out dist` — output directory
+
+Serve locally to preview:
+
+```powershell
+python scripts/build_static.py
+cd dist
+python -m http.server 8080
+# → http://127.0.0.1:8080/  (UI talks to Fly.io API)
+```
+
+### GitHub Pages (automated)
+
+1. **Enable Pages:** repo **Settings → Pages → Build and deployment → Source:**
+   choose **GitHub Actions** (not “Deploy from a branch”).
+2. Push to `master` — workflow `.github/workflows/pages.yml` runs
+   `python scripts/build_static.py` and publishes `dist/`.
+3. API deploy is unchanged: `.github/workflows/fly-deploy.yml` (Fly.io only).
+
+### Cloudflare Pages (optional)
+
+Connect the same repo in Cloudflare Pages:
+
+| Setting | Value |
+|---------|-------|
+| Build command | `python scripts/build_static.py` |
+| Build output directory | `dist` |
+| Root directory | `/` (repo root) |
+
+No Node.js required — the build script is stdlib-only Python.
+
+### CORS
+
+The Fly.io API allows browser requests from:
+
+- `https://coh-ucs-tools.fly.dev` (same-origin / API docs)
+- `https://coh-ucs-tools.pages.dev` (Cloudflare Pages default)
+- `https://benmed00.github.io` (GitHub Pages)
+- `http://127.0.0.1:8000`, `http://localhost:8000` (local monolith)
+
+Add custom UI domains with Fly secret or env:
+
+```powershell
+fly secrets set CORS_ORIGINS="https://my-ui.example.com" -a coh-ucs-tools
+```
+
+(`CORS_ORIGINS` is merged with the defaults above.)
+
+Credentials and headers: `X-API-Key`, `Content-Type` are allowed for API key auth.
+
+### What stays on Fly.io
+
+- REST API, SQLite, uploads volume, rate limiting, optional `UCS_API_KEY`
+- OpenAPI at `/docs`, `/redoc`
+
+The static CDN serves only HTML/CSS/JS — no server-side state.
+
+---

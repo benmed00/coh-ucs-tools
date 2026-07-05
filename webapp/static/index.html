@@ -30,6 +30,8 @@
     <a href="#/search" data-route="search">Search</a>
     <a href="#/merge-wizard" data-route="merge-wizard">Merge</a>
     <a href="#/validator" data-route="validator">Validator</a>
+    <a href="#/verify" data-route="verify">Verify</a>
+    <a href="#/translation" data-route="translation">PO/TMX</a>
     <a href="#/tools" data-route="tools">Tools</a>
     <a href="#/settings" data-route="settings">Settings</a>
     <a href="/docs" target="_blank" rel="noopener" class="nav-api">API &#8599;</a>
@@ -66,6 +68,16 @@
 <div id="toast" class="toast" hidden></div>
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.js"></script>
+<script src="/static/js/config.js"></script>
+<script>
+(function () {
+  var base = window.API_BASE || "";
+  if (!base) return;
+  document.querySelectorAll("a[href^='/docs'], a[href^='/redoc'], a[href^='/openapi.json']").forEach(function (a) {
+    a.href = base + a.getAttribute("href");
+  });
+})();
+</script>
 <script type="module" src="/static/js/hero.js"></script>
 <script type="module" src="/static/js/app.js"></script>
 <script>

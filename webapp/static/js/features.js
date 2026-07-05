@@ -1,6 +1,6 @@
 /* Extended SPA sections — diff, languages, search, settings, etc. */
 
-import { api, esc, fmt, loadFiles, fileOptions, fileLabel, toast, destroyCharts, makeChart, CHART_COLORS } from "./core.js";
+import { api, apiUrl, esc, fmt, loadFiles, fileOptions, fileLabel, toast, destroyCharts, makeChart, CHART_COLORS } from "./core.js";
 
 export function highlightTokens(text) {
   return esc(text).replace(/(%\d[A-Za-z]*%)/g, '<mark class="token">$1</mark>');
@@ -140,7 +140,7 @@ async function loadValidator(fid) {
         <div class="stat-row"><span class="k">status</span><span class="v ${val.ok?'good':'bad'}">${val.ok?'OK':'FAILED'}</span></div>
         <div class="stat-row"><span class="k">errors</span><span class="v">${val.errors}</span></div>
         <div class="stat-row"><span class="k">warnings</span><span class="v">${val.warnings}</span></div>
-        <a class="btn ghost small" href="/api/files/${fid}/issues.csv">Export CSV</a>
+        <a class="btn ghost small" href="${apiUrl(`/api/files/${fid}/issues.csv`)}">Export CSV</a>
       </div>
       <div class="card"><h3>Lint</h3>
         <div class="stat-row"><span class="k">token issues</span><span class="v">${lint.token_issue_count}</span></div>
@@ -193,9 +193,21 @@ export async function renderLanguages() {
 export async function renderMergeWizard(params) {
   const el = document.getElementById("view");
   const files = await loadFiles();
+  const tab = params.get("tab") || "twoway";
   el.innerHTML = `
     <h2 class="section-title">MERGE WIZARD</h2>
-    <p class="section-sub">3-step merge with preview — nothing translated, originals untouched.</p>
+    <p class="section-sub">Two-way or three-way merge — nothing translated, originals untouched.</p>
+    <div class="form-row" style="margin-bottom:12px">
+      <a class="btn ghost small ${tab==="twoway"?"active":""}" href="#/merge-wizard?tab=twoway">Two-way</a>
+      <a class="btn ghost small ${tab==="threeway"?"active":""}" href="#/merge-wizard?tab=threeway">Three-way</a>
+    </div>
+    <div id="mw-panel"></div>`;
+  if (tab === "threeway") await renderThreewayPanel(files, params);
+  else await renderTwowayPanel(files, params);
+}
+
+async function renderTwowayPanel(files, params) {
+  document.getElementById("mw-panel").innerHTML = `
     <div class="card" style="max-width:800px">
       <div class="form-row">
         <label class="field">1. Target<select id="mw-t">${fileOptions(files, params.get("target")||"")}</select></label>
@@ -225,6 +237,46 @@ export async function renderMergeWizard(params) {
       body: JSON.stringify({ target_id: document.getElementById("mw-t").value, source_id: document.getElementById("mw-s").value, mode }) });
     toast("Merge complete");
     document.getElementById("mw-out").innerHTML = `<div class="banner"><a href="${r.download_url}">Download ${esc(r.filename)}</a></div>`;
+  };
+}
+
+async function renderThreewayPanel(files, params) {
+  document.getElementById("mw-panel").innerHTML = `
+    <div class="card" style="max-width:900px">
+      <p class="section-sub">Base + branch A + branch B (e.g. THQ retail vs NSV vs CE).</p>
+      <div class="form-row">
+        <label class="field">Base<select id="3w-b">${fileOptions(files, params.get("base")||"")}</select></label>
+        <label class="field">Branch A<select id="3w-a">${fileOptions(files, params.get("a")||"")}</select></label>
+        <label class="field">Branch B<select id="3w-b2">${fileOptions(files, params.get("b")||"")}</select></label>
+      </div>
+      <div class="form-row">
+        <label class="field">Strategy<select id="3w-s">
+          <option value="prefer_a">prefer A</option>
+          <option value="prefer_b">prefer B</option>
+          <option value="manual_conflicts">list conflicts</option>
+        </select></label>
+        <button class="btn" id="3w-go">Three-way merge</button>
+      </div>
+      <div id="3w-out"></div>
+    </div>`;
+  document.getElementById("3w-go").onclick = async () => {
+    const out = document.getElementById("3w-out");
+    out.innerHTML = `<div class="loading">Merging</div>`;
+    const body = {
+      base_id: document.getElementById("3w-b").value,
+      a_id: document.getElementById("3w-a").value,
+      b_id: document.getElementById("3w-b2").value,
+      strategy: document.getElementById("3w-s").value,
+    };
+    if (!body.base_id || !body.a_id || !body.b_id) { toast("Pick all three files"); return; }
+    const r = await api("/api/merge/threeway", { method: "POST", body: JSON.stringify(body) });
+    out.innerHTML = `
+      <div class="banner"><a href="${r.download_url}">Download merged (${fmt(r.keys)} keys)</a>
+        · ${r.conflicts.length} conflict(s)</div>
+      ${r.conflicts.length ? `<div class="table-wrap"><table class="data"><thead><tr><th>id</th><th>base</th><th>A</th><th>B</th></tr></thead>
+        <tbody>${r.conflicts.slice(0,50).map(c => `<tr><td class="num">${c.key}</td>
+          <td class="val">${esc(c.base||"—")}</td><td class="val">${esc(c.a||"—")}</td><td class="val">${esc(c.b||"—")}</td></tr>`).join("")}
+        </tbody></table></div>` : ""}`;
   };
 }
 
@@ -423,8 +475,33 @@ export async function renderBookmarks() {
 /* ---------------------------------------------------------- patch builder */
 export async function renderPatch(params) {
   const files = await loadFiles();
+  const mode = params.get("mode") || "build";
   document.getElementById("view").innerHTML = `
     <h2 class="section-title">PATCH BUILDER</h2>
+    <div class="form-row" style="margin-bottom:12px">
+      <a class="btn ghost small ${mode==="build"?"active":""}" href="#/patch?mode=build">Build subset</a>
+      <a class="btn ghost small ${mode==="apply"?"active":""}" href="#/patch?mode=apply">Apply patch</a>
+    </div>
+    <div id="pb-panel"></div>`;
+  if (mode === "apply") {
+    document.getElementById("pb-panel").innerHTML = `
+      <p class="section-sub">Overlay a patch UCS onto a base file (changed + new keys).</p>
+      <div class="form-row">
+        <label class="field">Base<select id="pa-b">${fileOptions(files, params.get("base")||"")}</select></label>
+        <label class="field">Patch<select id="pa-p">${fileOptions(files, params.get("patch")||"")}</select></label>
+        <button class="btn" id="pa-go">Apply</button>
+      </div>
+      <div id="pa-out"></div>`;
+    document.getElementById("pa-go").onclick = async () => {
+      const r = await api("/api/patch/apply", { method:"POST", headers:{"Content-Type":"application/json"},
+        body: JSON.stringify({ base_id: document.getElementById("pa-b").value, patch_id: document.getElementById("pa-p").value }) });
+      document.getElementById("pa-out").innerHTML = `<div class="banner">
+        <a href="${r.download_url}">Download patched (${r.keys} keys)</a>
+        · ${r.changed} changed · ${r.added} added</div>`;
+    };
+    return;
+  }
+  document.getElementById("pb-panel").innerHTML = `
     <div class="form-row">
       <label class="field">File<select id="pb-f">${fileOptions(files, params.get("file")||"")}</select></label>
       <label class="field">Ranges<input id="pb-r" placeholder="559200-559650" value="${esc(params.get("ranges")||"")}"></label>
@@ -439,23 +516,212 @@ export async function renderPatch(params) {
   };
 }
 
+/* ---------------------------------------------------------- campaign map */
+export async function renderCampaigns() {
+  const el = document.getElementById("view");
+  const d = await api("/api/campaigns/ranges");
+  el.innerHTML = `
+    <h2 class="section-title">CAMPAIGN RANGES</h2>
+    <p class="section-sub">Approximate CoH1 id namespaces — use with patch builder / search.</p>
+    <div class="grid cols-2">${Object.entries(d.campaigns).map(([pack, ranges]) => `
+      <div class="card"><h3>${esc(pack.replace(/_/g, " "))}</h3>
+        <div class="table-wrap"><table class="data"><thead><tr><th>name</th><th>range</th><th></th></tr></thead>
+        <tbody>${ranges.map(r => `<tr>
+          <td>${esc(r.name)}</td><td class="num">${r.start}–${r.end}</td>
+          <td><a href="#/patch?mode=build&ranges=${r.start}-${r.end}">patch</a></td>
+        </tr>`).join("")}</tbody></table></div>
+      </div>`).join("")}
+    </div>`;
+}
+
+/* ----------------------------------------------------------- game profiles */
+export async function renderGames(params) {
+  const el = document.getElementById("view");
+  const files = await loadFiles();
+  const fid = params.get("file") || "";
+  const [profiles, classify] = await Promise.all([
+    api("/api/games"),
+    fid ? api(`/api/files/${fid}/game-profile`) : Promise.resolve(null),
+  ]);
+  el.innerHTML = `
+    <h2 class="section-title">GAME PROFILES</h2>
+    <p class="section-sub">CoH1 / CoH2 / Dawn of War UCS dialect hints.</p>
+    <label class="field">Classify upload<select id="gp-file"><option value="">—</option>${fileOptions(files, fid)}</select></label>
+    <div class="grid cols-2" style="margin-top:16px">
+      ${profiles.profiles.map(p => `<div class="card"><h3>${esc(p.name)}</h3>
+        <div class="stat-row"><span class="k">id</span><span class="v">${esc(p.id)}</span></div>
+        <div class="stat-row"><span class="k">BOM</span><span class="v">${p.bom_required?"required":"optional"}</span></div>
+        <div class="stat-row"><span class="k">typical max key</span><span class="v">${fmt(p.typical_max_key)}</span></div>
+        <p style="font-size:13px;color:var(--text-dim)">${esc(p.notes)}</p></div>`).join("")}
+    </div>
+    <div id="gp-out"></div>`;
+  document.getElementById("gp-file").onchange = e => {
+    if (e.target.value) location.hash = `#/games?file=${e.target.value}`;
+  };
+  if (classify) {
+    document.getElementById("gp-out").innerHTML = `
+      <h3 class="section-title" style="margin-top:20px">Classification</h3>
+      <div class="banner">Best match: <strong>${esc(classify.classification.best_match)}</strong>
+        (${(classify.classification.confidence*100).toFixed(0)}% confidence)</div>
+      <div class="table-wrap"><table class="data"><thead><tr><th>profile</th><th>score</th></tr></thead>
+      <tbody>${classify.classification.candidates.map(c => `<tr><td>${esc(c.name)}</td><td class="num">${c.score}</td></tr>`).join("")}
+      </tbody></table></div>
+      ${classify.classification.warnings.length ? `<p class="section-sub">Warnings: ${classify.classification.warnings.map(esc).join("; ")}</p>` : ""}`;
+  }
+}
+
 /* ------------------------------------------------------------- sga browser */
 export async function renderSga() {
   document.getElementById("view").innerHTML = `
     <h2 class="section-title">SGA BROWSER</h2>
+    <p class="section-sub">Scan install archives; list internals; extract locale <code>.ucs</code> files.</p>
     <div class="form-row">
       <label class="field" style="flex:2">Install path<input id="sga-p" placeholder="C:\\Games\\Company of Heroes..."></label>
-      <button class="btn" id="sga-go">Scan</button>
+      <button class="btn" id="sga-go">Scan archives</button>
+      <button class="btn ghost" id="sga-locale">Locale scan</button>
+      <button class="btn" id="sga-extract-all">Extract all UCS</button>
     </div>
     <div id="sga-out"></div>`;
+  document.getElementById("sga-locale").onclick = async () => {
+    const install = document.getElementById("sga-p").value;
+    if (!install) { toast("Enter install path"); return; }
+    const d = await api(`/api/sga/locale-scan?install_path=${encodeURIComponent(install)}`);
+    document.getElementById("sga-out").innerHTML = `
+      <div class="banner">${d.count} archive(s) with locale UCS</div>
+      ${d.archives.map(a => `<div class="card" style="margin-top:10px"><h3>${esc(a.relative)}</h3>
+        <p>${esc(a.locale_hint||"locale")} · ${a.locale_ucs.length} file(s)</p>
+        <ul>${a.locale_ucs.map(u => `<li>${esc(u.path)} (${fmt(u.size)} B)</li>`).join("")}</ul></div>`).join("")}`;
+  };
+  document.getElementById("sga-extract-all").onclick = async () => {
+    const install = document.getElementById("sga-p").value;
+    if (!install) { toast("Enter install path"); return; }
+    const d = await api("/api/sga/extract-locales", { method: "POST",
+      body: JSON.stringify({ install_path: install }) });
+    toast(`Extracted ${d.uploaded} UCS file(s)`);
+    document.getElementById("sga-out").innerHTML = `
+      <div class="banner">${d.uploaded} uploaded · ${d.errors?.length||0} error(s)</div>
+      <ul>${(d.files||[]).map(f => `<li><a href="#/upload?file=${f.file_id}">${esc(f.internal_path)}</a></li>`).join("")}</ul>`;
+  };
   document.getElementById("sga-go").onclick = async () => {
     const p = encodeURIComponent(document.getElementById("sga-p").value);
     const d = await api(`/api/sga/scan?install_path=${p}`);
     document.getElementById("sga-out").innerHTML = `
-      <div class="table-wrap"><table class="data"><thead><tr><th>path</th><th>size</th><th>stub?</th></tr></thead>
-      <tbody>${d.files.map(f => `<tr><td>${esc(f.path)}</td><td>${fmt(f.size)}</td><td>${f.likely_stub?"yes":"no"}</td></tr>`).join("")}
-      </tbody></table></div>`;
+      <div class="table-wrap"><table class="data"><thead><tr><th>archive</th><th>size</th><th>stub?</th><th></th></tr></thead>
+      <tbody>${d.files.map(f => `<tr>
+        <td><a href="#" class="sga-open" data-path="${esc(document.getElementById("sga-p").value)}\\${esc(f.path)}">${esc(f.path)}</a></td>
+        <td>${fmt(f.size)}</td><td>${f.likely_stub?"yes":"no"}</td>
+        <td><button class="btn ghost small sga-open" data-path="${esc(document.getElementById("sga-p").value)}\\${esc(f.path)}">Browse</button></td>
+      </tr>`).join("")}
+      </tbody></table></div>
+      <div id="sga-detail"></div>`;
+    document.querySelectorAll(".sga-open").forEach(btn => btn.onclick = async e => {
+      e.preventDefault();
+      const path = btn.dataset.path.replace(/\\\\/g, "\\");
+      const c = await api(`/api/sga/${encodeURIComponent(path)}/contents`);
+      const detail = document.getElementById("sga-detail");
+      if (c.error) { detail.innerHTML = `<div class="banner error">${esc(c.error)}</div>`; return; }
+      const locale = (c.locale_ucs || []).slice(0, 20);
+      detail.innerHTML = `
+        <h3 class="section-title" style="margin-top:20px">${esc(c.archive_name)} · ${fmt(c.file_count)} files
+          ${c.locale_hint ? `· locale: ${esc(c.locale_hint)}` : ""}</h3>
+        ${locale.length ? `<p class="section-sub">Locale UCS: ${locale.map(esc).join(", ")}</p>` : ""}
+        <div class="table-wrap"><table class="data"><thead><tr><th>path</th><th>size</th><th></th></tr></thead>
+        <tbody>${(c.files || []).filter(f => !f.likely_stub).slice(0, 100).map(f => `<tr>
+          <td>${esc(f.path)}</td><td>${fmt(f.size)}</td>
+          <td>${f.path.toLowerCase().endsWith(".ucs") ? `<button class="btn ghost small sga-ex" data-arch="${esc(path)}" data-int="${esc(f.path)}">Extract</button>` : ""}</td>
+        </tr>`).join("")}
+        </tbody></table></div>`;
+      detail.querySelectorAll(".sga-ex").forEach(b => b.onclick = async () => {
+        const r = await api(`/api/sga/${encodeURIComponent(b.dataset.arch)}/extract`, {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ internal_path: b.dataset.int }),
+        });
+        toast(r.file_id ? `Extracted → upload ${r.file_id}` : `Extracted ${r.bytes} bytes`);
+        if (r.file_id) location.hash = `#/upload?file=${r.file_id}`;
+      });
+    });
   };
+}
+
+/* -------------------------------------------------------- verify checklist */
+export async function renderVerify(params) {
+  const el = document.getElementById("view");
+  const files = await loadFiles();
+  const fid = params.get("file") || "";
+  el.innerHTML = `
+    <h2 class="section-title">VERIFY CHECKLIST</h2>
+    <p class="section-sub">Known-bad IDs (<code>559200</code>, <code>9419700</code>, ToV menus) — run before installing in-game.</p>
+    <label class="field">File<select id="vf-file"><option value="">—</option>${fileOptions(files, fid)}</select></label>
+    <button class="btn" id="vf-go">Run checklist</button>
+    <div id="vf-out"></div>`;
+  document.getElementById("vf-file").onchange = e => {
+    if (e.target.value) location.hash = `#/verify?file=${e.target.value}`;
+  };
+  document.getElementById("vf-go").onclick = () => {
+    const v = document.getElementById("vf-file").value;
+    if (v) location.hash = `#/verify?file=${v}`;
+  };
+  if (fid) await loadVerify(fid);
+}
+
+async function loadVerify(fid) {
+  const out = document.getElementById("vf-out");
+  out.innerHTML = `<div class="loading">Checking</div>`;
+  const d = await api(`/api/files/${fid}/verify`);
+  const row = r => `<tr class="${r.status}">
+    <td class="num">${r.key}</td><td>${esc(r.category)}</td><td>${esc(r.label)}</td>
+    <td class="${r.status === "pass" ? "good" : r.status === "fail" ? "bad" : ""}">${esc(r.status)}</td>
+    <td>${esc(r.message)}</td><td class="val">${r.value != null ? esc(r.value) : "—"}</td></tr>`;
+  out.innerHTML = `
+    <div class="banner ${d.ok ? "" : "error"}">${d.passed}/${d.total} pass · ${d.failed} fail · ${d.warned} warn
+      ${d.ok ? "— ready for in-game check" : "— fix failures before install"}</div>
+    <div class="table-wrap"><table class="data"><thead><tr><th>id</th><th>cat</th><th>label</th><th>status</th><th>message</th><th>value</th></tr></thead>
+    <tbody>${d.items.map(row).join("")}</tbody></table></div>
+    <div class="card" style="margin-top:16px"><h3>In-game steps</h3><ul>
+      ${(d.install_tips || []).map(t => `<li>${esc(t)}</li>`).join("")}
+    </ul></div>`;
+}
+
+/* ---------------------------------------------------------- translation I/O */
+export async function renderTranslation(params) {
+  const files = await loadFiles();
+  const fid = params.get("file") || "";
+  document.getElementById("view").innerHTML = `
+    <h2 class="section-title">PO / TMX</h2>
+    <p class="section-sub">Export for CAT tools (gettext PO, TMX 1.4); import translations back to UCS.</p>
+    <label class="field">Template UCS<select id="tr-file"><option value="">—</option>${fileOptions(files, fid)}</select></label>
+    <div class="form-row" style="margin-top:12px">
+      <a class="btn ghost" id="tr-po-dl" href="#">Download PO</a>
+      <a class="btn ghost" id="tr-tmx-dl" href="#">Download TMX</a>
+    </div>
+    <div class="card" style="margin-top:20px">
+      <h3>Import PO or TMX</h3>
+      <label class="field">Format<select id="tr-fmt"><option value="po">PO (gettext)</option><option value="tmx">TMX</option></select></label>
+      <textarea id="tr-text" rows="12" style="width:100%;font-family:var(--mono);background:var(--panel);color:var(--text);border:1px solid var(--border);padding:8px" placeholder="Paste .po or .tmx content"></textarea>
+      <button class="btn" id="tr-import" style="margin-top:8px">Import → new UCS</button>
+      <div id="tr-out"></div>
+    </div>`;
+  const syncLinks = () => {
+    const id = document.getElementById("tr-file").value;
+    document.getElementById("tr-po-dl").href = id ? apiUrl(`/api/files/${id}/po`) : "#";
+    document.getElementById("tr-tmx-dl").href = id ? apiUrl(`/api/files/${id}/tmx`) : "#";
+  };
+  document.getElementById("tr-file").onchange = () => {
+    syncLinks();
+    const v = document.getElementById("tr-file").value;
+    if (v) location.hash = `#/translation?file=${v}`;
+  };
+  document.getElementById("tr-import").onclick = async () => {
+    const id = document.getElementById("tr-file").value;
+    const text = document.getElementById("tr-text").value;
+    if (!id || !text) { toast("Pick file and paste content"); return; }
+    const fmt = document.getElementById("tr-fmt").value;
+    const body = fmt === "tmx" ? { tmx: text } : { po: text };
+    const path = fmt === "tmx" ? "tmx" : "po";
+    const r = await api(`/api/files/${id}/${path}`, { method: "POST", body: JSON.stringify(body) });
+    document.getElementById("tr-out").innerHTML = `<div class="banner"><a href="#/upload?file=${r.file_id}">Imported ${r.keys} keys → ${r.file_id}</a></div>`;
+  };
+  if (fid) { document.getElementById("tr-file").value = fid; syncLinks(); }
 }
 
 /* --------------------------------------------------------------- editor */
@@ -523,9 +789,17 @@ export async function renderSettings() {
       <label class="field" style="margin-top:16px">API key (for uploads/merge when server requires it)
         <input type="password" id="api-key" placeholder="X-API-Key" autocomplete="off" style="width:100%;margin-top:6px;padding:8px;background:var(--panel);border:1px solid var(--border);color:var(--text)">
       </label>
-      <p style="margin-top:16px"><a href="/docs" target="_blank">OpenAPI docs (/docs)</a> ·
-        <a href="/api/export/openapi-client" target="_blank">Client snippets</a></p>
+      <p style="margin-top:16px"><a href="${apiUrl("/docs")}" target="_blank">OpenAPI docs (/docs)</a> ·
+        <a href="${apiUrl("/api/export/openapi-client")}" target="_blank">Client snippets</a></p>
+      <button class="btn ghost small" id="dup-probe" style="margin-top:12px">Generate duplicate-ID probe</button>
+      <div id="dup-out"></div>
     </div>`;
+  document.getElementById("dup-probe").onclick = async () => {
+    const r = await api("/api/tools/duplicate-probe", { method: "POST" });
+    document.getElementById("dup-out").innerHTML = `
+      <div class="banner" style="margin-top:10px"><a href="${r.download_url}">Download probe</a></div>
+      <ul style="font-size:13px;margin-top:8px">${(r.instructions||[]).map(i => `<li>${esc(i)}</li>`).join("")}</ul>`;
+  };
   document.getElementById("theme-t").onchange = e => {
     const light = e.target.checked;
     document.documentElement.dataset.theme = light ? "light" : "dark";
