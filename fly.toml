@@ -2,8 +2,8 @@
 # Deploy: fly deploy
 # Docs:  docs/DEPLOY.md
 
-app = 'coh-ucs-tools-benmed00'
-primary_region = 'cdg'
+app = 'coh-ucs-tools'
+primary_region = 'iad'
 
 [build]
   dockerfile = 'Dockerfile'
