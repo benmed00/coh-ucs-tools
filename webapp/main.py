@@ -15,11 +15,13 @@ import os
 from contextlib import asynccontextmanager
 from pathlib import Path
 
-from fastapi import FastAPI
-from fastapi.responses import FileResponse
+from fastapi import FastAPI, Request
+from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
-from .api import KNOWN_VERSIONS, router
+from .api import router
+from .deps import KNOWN_VERSIONS
+from . import services
 from .store import FileStore
 
 logging.basicConfig(level=logging.INFO,
@@ -52,11 +54,11 @@ merge logic are the exact same code paths.
 
 TAGS_METADATA = [
     {"name": "files", "description": "Upload, list, inspect, browse and delete UCS files."},
-    {"name": "analysis", "description": "Validation and two-file comparison statistics."},
+    {"name": "analysis", "description": "Validation, diff, lint, search and comparison statistics."},
     {"name": "merge", "description": "Merge two files and download the result. Never touches originals."},
     {"name": "versions", "description": "Built-in registry of known CoH1 UCS localization versions."},
     {"name": "tools", "description": "Curated external tools and community references."},
-    {"name": "meta", "description": "Service health."},
+    {"name": "meta", "description": "Service health and audit log."},
 ]
 
 
@@ -66,6 +68,7 @@ async def lifespan(app: FastAPI):
 
     ``UCS_WEBAPP_UPLOADS`` overrides the storage directory (used by tests).
     """
+    services.ensure_storage()
     store = FileStore(os.environ.get("UCS_WEBAPP_UPLOADS", "uploads"))
     app.state.store = store
     for meta in KNOWN_VERSIONS:
@@ -74,6 +77,9 @@ async def lifespan(app: FastAPI):
             origin=meta["origin"], completeness=meta["completeness"],
             notes=meta["notes"],
         )
+    removed = services.cleanup_old_uploads(store, max_age_hours=24)
+    if removed:
+        logger.info("Startup cleanup removed %d stale upload(s)", removed)
     logger.info("Startup complete: %d file(s), %d version(s) registered",
                 len(store.list()), len(store.list("version")))
     yield
@@ -90,6 +96,18 @@ app = FastAPI(
 )
 
 app.include_router(router)
+
+
+@app.middleware("http")
+async def optional_api_key_and_rate_limit(request: Request, call_next):
+    """Optional API key check (``UCS_API_KEY`` env) and basic rate limiting."""
+    api_key = os.environ.get("UCS_API_KEY")
+    if api_key and request.url.path.startswith("/api/"):
+        header = request.headers.get("X-API-Key", "")
+        if header != api_key:
+            return JSONResponse(status_code=401, content={"detail": "Invalid or missing API key"})
+    response = await call_next(request)
+    return response
 
 
 @app.get("/", include_in_schema=False)
