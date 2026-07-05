@@ -11,7 +11,7 @@
 <link rel="stylesheet" href="/static/css/app.css">
 </head>
 <body>
-<a class="skip-link" href="#view">Skip to main content</a>
+<a class="skip-link" href="#view" data-i18n="skip.main">Skip to main content</a>
 <div class="scanlines" aria-hidden="true"></div>
 
 <header class="topbar">
@@ -20,21 +20,24 @@
     <span class="brand-name">CoH&nbsp;UCS&nbsp;TOOLS</span>
     <span class="brand-sub">LOCALE&nbsp;COMMAND&nbsp;CONSOLE</span>
   </a>
-  <nav class="nav" id="nav" aria-label="Main navigation">
-    <a href="/" data-route="dashboard">Dashboard</a>
-    <a href="/upload" data-route="upload">Upload</a>
-    <a href="/compare" data-route="compare">Compare</a>
-    <a href="/diff" data-route="diff">Diff</a>
-    <a href="/languages" data-route="languages">Languages</a>
-    <a href="/search" data-route="search">Search</a>
-    <a href="/merge-wizard" data-route="merge-wizard">Merge</a>
-    <a href="/validator" data-route="validator">Validator</a>
-    <a href="/verify" data-route="verify">Verify</a>
-    <a href="/translation" data-route="translation">PO/TMX</a>
-    <a href="/tools" data-route="tools">Tools</a>
-    <a href="/settings" data-route="settings">Settings</a>
-    <a href="/docs" target="_blank" rel="noopener noreferrer" class="nav-api">API &#8599;</a>
-  </nav>
+  <div class="topbar-actions">
+    <button type="button" class="nav-toggle" id="nav-toggle" aria-expanded="false" aria-controls="nav" data-i18n="nav.menu">Menu</button>
+    <nav class="nav" id="nav" aria-label="Main navigation">
+    <a href="/" data-route="dashboard" data-i18n="nav.dashboard">Dashboard</a>
+    <a href="/upload" data-route="upload" data-i18n="nav.upload">Upload</a>
+    <a href="/compare" data-route="compare" data-i18n="nav.compare">Compare</a>
+    <a href="/diff" data-route="diff" data-i18n="nav.diff">Diff</a>
+    <a href="/languages" data-route="languages" data-i18n="nav.languages">Languages</a>
+    <a href="/search" data-route="search" data-i18n="nav.search">Search</a>
+    <a href="/merge-wizard" data-route="merge-wizard" data-i18n="nav.merge">Merge</a>
+    <a href="/validator" data-route="validator" data-i18n="nav.validator">Validator</a>
+    <a href="/verify" data-route="verify" data-i18n="nav.verify">Verify</a>
+    <a href="/translation" data-route="translation" data-i18n="nav.translation">PO/TMX</a>
+    <a href="/tools" data-route="tools" data-i18n="nav.tools">Tools</a>
+    <a href="/settings" data-route="settings" data-i18n="nav.settings">Settings</a>
+    <a href="/docs" target="_blank" rel="noopener noreferrer" class="nav-api" data-i18n="nav.api">API &#8599;</a>
+    </nav>
+  </div>
 </header>
 
 <section class="hero" id="hero" aria-label="Introduction">
@@ -43,14 +46,14 @@
     <div class="radar-css"><div class="radar-sweep"></div></div>
   </div>
   <div class="hero-copy">
-    <h1>UCS LOCALIZATION<br>COMMAND CONSOLE</h1>
+    <h1 data-i18n-html="hero.title">UCS LOCALIZATION<br>COMMAND CONSOLE</h1>
     <p class="hero-tag">Analyze &middot; compare &middot; merge Company&nbsp;of&nbsp;Heroes <code>.ucs</code> files.
        UTF-16-LE, <code>FF&nbsp;FE</code> BOM, CRLF, <code>id&#8677;text</code> — we speak it fluently.</p>
     <div class="hero-badges">
-      <span class="badge" data-tip="Every UCS file starts with the 2-byte little-endian byte-order mark FF FE.">BOM FF FE</span>
-      <span class="badge" data-tip="Values are everything after the FIRST tab — they may legally contain more tabs.">TAB separated</span>
-      <span class="badge" data-tip="When the engine can't resolve an id it renders '$id No Key' in-game.">$id No Key</span>
-      <span class="badge" data-tip="The format has no comment syntax. Anything that isn't id&#8677;text is invalid.">no comments</span>
+      <button type="button" class="badge" data-tip="Every UCS file starts with the 2-byte little-endian byte-order mark FF FE.">BOM FF FE</button>
+      <button type="button" class="badge" data-tip="Values are everything after the FIRST tab — they may legally contain more tabs.">TAB separated</button>
+      <button type="button" class="badge" data-tip="When the engine can't resolve an id it renders '$id No Key' in-game.">$id No Key</button>
+      <button type="button" class="badge" data-tip="The format has no comment syntax. Anything that isn't id&#8677;text is invalid.">no comments</button>
     </div>
   </div>
 </section>
@@ -58,7 +61,7 @@
 <main id="view" class="view">
 <!-- SEO:NOSCRIPT -->
 <!-- /SEO:NOSCRIPT -->
-<div class="loading">Booting console&hellip;</div>
+<div class="loading" data-i18n="msg.booting">Booting console&hellip;</div>
 </main>
 
 <footer class="footer">

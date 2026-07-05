@@ -36,9 +36,10 @@ _PATH_REWRITES = (
     ("/static/icons/", "./icons/"),
     ("/static/manifest.json", "./manifest.json"),
     ("/static/service-worker.js", "./service-worker.js"),
+    ('href="/sitemap.xml"', 'href="./sitemap.xml"'),
 )
 
-_SW_CACHE = "coh-ucs-v4"
+_SW_CACHE = "coh-ucs-v6"
 
 # Service-worker cache list uses absolute /static/ paths in source.
 _SW_ASSETS = (
@@ -48,6 +49,7 @@ _SW_ASSETS = (
     "./js/config.js",
     "./js/router.js",
     "./js/seo.js",
+    "./js/i18n.js",
     "./js/app.js",
     "./js/core.js",
     "./js/features.js",
@@ -183,18 +185,29 @@ def _base_path_for_site(site_url: str) -> str:
     return ""
 
 
+def _prepare_out_dir(out_dir: Path) -> None:
+    """Clear *out_dir* contents without removing the directory itself (Windows-safe)."""
+    out_dir.mkdir(parents=True, exist_ok=True)
+    for child in list(out_dir.iterdir()):
+        if child.is_dir():
+            shutil.rmtree(child, ignore_errors=True)
+        else:
+            try:
+                child.unlink()
+            except OSError:
+                pass
+
+
 def build_static(out_dir: Path, api_base: str, site_url: str) -> None:
     """Populate *out_dir* with a static CDN-ready frontend."""
     from webapp.seo import inject_index_html
 
-    if out_dir.exists():
-        shutil.rmtree(out_dir)
-    out_dir.mkdir(parents=True)
+    _prepare_out_dir(out_dir)
 
     for name in ("css", "js", "i18n", "icons", "fonts"):
         src = STATIC_SRC / name
         if src.is_dir():
-            shutil.copytree(src, out_dir / name)
+            shutil.copytree(src, out_dir / name, dirs_exist_ok=True)
 
     base_path = _base_path_for_site(site_url)
     index_src = (STATIC_SRC / "index.html").read_text(encoding="utf-8")

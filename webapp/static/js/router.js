@@ -57,6 +57,21 @@ export function initNavLinks() {
   });
 }
 
+/** Intercept in-app nav clicks — client-side routing without full reload. */
+export function initSpaNav() {
+  document.addEventListener("click", (e) => {
+    const a = e.target.closest("a[data-route]");
+    if (!a || e.defaultPrevented || e.button !== 0) return;
+    if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+    if (a.target && a.target !== "_self") return;
+    const name = a.dataset.route;
+    if (!name) return;
+    e.preventDefault();
+    const url = new URL(a.href, location.origin);
+    navigateRoute(name, url.search ? new URLSearchParams(url.search) : undefined);
+  });
+}
+
 /** Canonical URL for SEO (uses ``window.SITE_URL`` when set). */
 export function canonicalUrl(routeName) {
   const origin = (window.SITE_URL || window.location.origin + basePath()).replace(/\/$/, "");

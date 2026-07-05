@@ -1,4 +1,4 @@
-const CACHE = "coh-ucs-v4";
+const CACHE = "coh-ucs-v6";
 const ASSETS = [
   "/",
   "/static/css/fonts.css",
@@ -6,6 +6,7 @@ const ASSETS = [
   "/static/js/config.js",
   "/static/js/router.js",
   "/static/js/seo.js",
+  "/static/js/i18n.js",
   "/static/js/app.js",
   "/static/js/core.js",
   "/static/js/features.js",

@@ -2,6 +2,7 @@
 
 import { api, apiUrl, esc, fmt, loadFiles, fileOptions, fileLabel, isHybridUi, toast, destroyCharts, makeChart, CHART_COLORS, profileQueryString, profileBarHtml, bindProfileBar } from "./core.js";
 import { navigateRoute, routePath } from "./router.js";
+import { t, setLocale } from "./i18n.js";
 
 export function highlightTokens(text) {
   return esc(text).replace(/(%\d[A-Za-z]*%)/g, '<mark class="token">$1</mark>');
@@ -14,17 +15,17 @@ export async function copyTable(btn, tableSel) {
     [...tr.cells].map(c => c.innerText).join("\t")
   ).join("\n");
   await navigator.clipboard.writeText(rows);
-  toast("Copied to clipboard");
+  toast(t("msg.copied_clipboard"));
 }
 
 /* ------------------------------------------------------------------ diff */
 export async function renderDiff(params) {
   const el = document.getElementById("view");
-  el.innerHTML = `<div class="loading">Loading</div>`;
+  el.innerHTML = `<div class="loading">${t("msg.loading")}</div>`;
   const files = await loadFiles();
   const a = params.get("a") || "", b = params.get("b") || "", filter = params.get("filter") || "changed";
   el.innerHTML = `
-    <h2 class="section-title">DIFF</h2>
+    <h2 class="section-title">${t("route.diff")}</h2>
     <p class="section-sub">Side-by-side entry diff with <code>%token%</code> highlighting.</p>
     <div class="form-row section">
       <label class="field">File A<select id="d-a"><option value="">—</option>${fileOptions(files, a)}</select></label>
@@ -38,7 +39,7 @@ export async function renderDiff(params) {
     <div id="diff-out"></div>`;
   document.getElementById("d-go").onclick = () => {
     const va = document.getElementById("d-a").value, vb = document.getElementById("d-b").value;
-    if (!va || !vb) { toast("Pick both files"); return; }
+    if (!va || !vb) { toast(t("msg.pick_both")); return; }
     navigateRoute("diff", { a: va, b: vb, filter: document.getElementById("d-f").value });
   };
   if (a && b) await runDiff(a, b, filter);
@@ -46,7 +47,7 @@ export async function renderDiff(params) {
 
 async function runDiff(a, b, filter) {
   const out = document.getElementById("diff-out");
-  out.innerHTML = `<div class="loading">Diffing</div>`;
+  out.innerHTML = `<div class="loading">${t("msg.diffing")}</div>`;
   const d = await api(`/api/files/${a}/diff/${b}?filter=${filter}&limit=200`);
   out.innerHTML = `
     <div class="banner">${fmt(d.total)} row(s) · filter <code>${esc(filter)}</code>
@@ -64,11 +65,11 @@ async function runDiff(a, b, filter) {
 /* --------------------------------------------------------------- ranges */
 export async function renderRanges(params) {
   const el = document.getElementById("view");
-  el.innerHTML = `<div class="loading">Loading</div>`;
+  el.innerHTML = `<div class="loading">${t("msg.loading")}</div>`;
   const files = await loadFiles();
   const a = params.get("a") || "", b = params.get("b") || "";
   el.innerHTML = `
-    <h2 class="section-title">MISSING RANGES</h2>
+    <h2 class="section-title">${t("route.ranges")}</h2>
     <p class="section-sub">Heatmap of missing ID blocks — click a bucket to look up entries.
        Empty gaps render in-game as <code>$id No Key</code>.</p>
     <div class="form-row">
@@ -116,7 +117,7 @@ export async function renderValidator(params) {
   const files = await loadFiles();
   const fid = params.get("file") || "";
   el.innerHTML = `
-    <h2 class="section-title">VALIDATOR</h2>
+    <h2 class="section-title">${t("route.validator")}</h2>
     <p class="section-sub">Script detection, MISSING literals, duplicates, invalid lines.</p>
     <label class="field">File<select id="v-file"><option value="">—</option>${fileOptions(files, fid)}</select></label>
     <div id="v-out"></div>`;
@@ -129,7 +130,7 @@ export async function renderValidator(params) {
 
 async function loadValidator(fid) {
   const out = document.getElementById("v-out");
-  out.innerHTML = `<div class="loading">Validating</div>`;
+  out.innerHTML = `<div class="loading">${t("msg.validating")}</div>`;
   const [val, lint, issues] = await Promise.all([
     api(`/api/files/${fid}/validate`),
     api(`/api/files/${fid}/lint`),
@@ -160,11 +161,11 @@ async function loadValidator(fid) {
 /* ------------------------------------------------------------- languages */
 export async function renderLanguages() {
   const el = document.getElementById("view");
-  el.innerHTML = `<div class="loading">Loading hub</div>`;
+  el.innerHTML = `<div class="loading">${t("msg.loading")}</div>`;
   const [d, cov] = await Promise.all([api("/api/languages"), api("/api/languages/coverage")]);
   const covMap = Object.fromEntries((cov.locales || []).map(r => [r.code, r]));
   el.innerHTML = `
-    <h2 class="section-title">LANGUAGES</h2>
+    <h2 class="section-title">${t("route.languages")}</h2>
     <p class="section-sub">Coverage vs reference (${fmt(d.reference_keys)} keys).
       <a href="${apiUrl("/api/languages/coverage.csv")}" class="btn ghost small" style="margin-left:8px">Export CSV</a>
     </p>
@@ -243,7 +244,7 @@ export async function renderMergeWizard(params) {
   const files = await loadFiles();
   const tab = params.get("tab") || "twoway";
   el.innerHTML = `
-    <h2 class="section-title">MERGE WIZARD</h2>
+    <h2 class="section-title">${t("route.merge_wizard")}</h2>
     <p class="section-sub">Two-way or three-way merge — nothing translated, originals untouched.</p>
     ${profileBarHtml()}
     <div class="form-row" style="margin-bottom:12px">
@@ -285,7 +286,7 @@ async function renderTwowayPanel(files, params) {
     const mode = document.querySelector('input[name="mw-m"]:checked').value;
     const r = await api(`/api/merge?${profileQueryString()}`, { method: "POST", headers: {"Content-Type":"application/json"},
       body: JSON.stringify({ target_id: document.getElementById("mw-t").value, source_id: document.getElementById("mw-s").value, mode }) });
-    toast("Merge complete");
+    toast(t("msg.merge_complete"));
     document.getElementById("mw-out").innerHTML = `<div class="banner"><a href="${r.download_url}">Download ${esc(r.filename)}</a></div>`;
   };
 }
@@ -318,7 +319,7 @@ async function renderThreewayPanel(files, params) {
       b_id: document.getElementById("3w-b2").value,
       strategy: document.getElementById("3w-s").value,
     };
-    if (!body.base_id || !body.a_id || !body.b_id) { toast("Pick all three files"); return; }
+    if (!body.base_id || !body.a_id || !body.b_id) { toast(t("msg.pick_three")); return; }
     const r = await api("/api/merge/threeway", { method: "POST", body: JSON.stringify(body) });
     out.innerHTML = `
       <div class="banner"><a href="${r.download_url}">Download merged (${fmt(r.keys)} keys)</a>
@@ -333,8 +334,8 @@ async function renderThreewayPanel(files, params) {
 /* --------------------------------------------------------------- install */
 export async function renderInstall() {
   const el = document.getElementById("view");
-  el.innerHTML = `<h2 class="section-title">INSTALL DETECT</h2>
-    <button class="btn" id="inst-go">Scan known paths</button><div id="inst-out"></div>`;
+  el.innerHTML = `<h2 class="section-title">${t("route.install")}</h2>
+    <button class="btn" id="inst-go">${t("btn.scan")}</button><div id="inst-out"></div>`;
   document.getElementById("inst-go").onclick = async () => {
     const d = await api("/api/install/detect");
     document.getElementById("inst-out").innerHTML = `
@@ -348,7 +349,7 @@ export async function renderInstall() {
         <button class="btn ghost small" id="copy-ps">Copy commands</button></div>`;
     document.getElementById("copy-ps").onclick = () => {
       navigator.clipboard.writeText(`${d.backup_command}\n${d.copy_command}`);
-      toast("Copied");
+      toast(t("msg.copied"));
     };
   };
 }
@@ -358,8 +359,8 @@ export async function renderMtLab() {
   const el = document.getElementById("view");
   const files = await loadFiles();
   el.innerHTML = `
-    <h2 class="section-title">MT LAB</h2>
-    <p class="section-sub">Queue machine-translation QA jobs (never written to game files).</p>
+    <h2 class="section-title">${t("route.mt")}</h2>
+    <p class="section-sub">${t("route.mt.sub")}</p>
     <div class="form-row">
       <label class="field">Source<select id="mt-s">${fileOptions(files,"")}</select></label>
       <label class="field">sl<input id="mt-sl" value="ru"></label>
@@ -399,7 +400,7 @@ export async function renderGlossary() {
   const d = await api("/api/glossary");
   const rows = Object.entries(d.terms);
   el.innerHTML = `
-    <h2 class="section-title">GLOSSARY</h2>
+    <h2 class="section-title">${t("route.glossary")}</h2>
     <div class="table-wrap"><table class="data" id="gl-table">
       <thead><tr><th>term</th><th>fixed translation</th><th></th></tr></thead>
       <tbody>${rows.map(([k,v]) => `<tr><td><input value="${esc(k)}" class="gl-k"></td>
@@ -419,7 +420,7 @@ export async function renderGlossary() {
       if (k) terms[k] = v;
     });
     await api("/api/glossary", { method:"PUT", headers:{"Content-Type":"application/json"}, body: JSON.stringify({ terms }) });
-    toast("Glossary saved");
+    toast(t("msg.glossary_saved"));
   };
   document.getElementById("gl-table").addEventListener("click", e => {
     if (e.target.classList.contains("gl-rm")) e.target.closest("tr").remove();
@@ -430,7 +431,7 @@ export async function renderGlossary() {
 export async function renderTimeline() {
   const d = await api("/api/versions/timeline");
   document.getElementById("view").innerHTML = `
-    <h2 class="section-title">TIMELINE</h2>
+    <h2 class="section-title">${t("route.timeline")}</h2>
     <div class="timeline">${d.entries.map(e => `
       <div class="timeline-item ${e.available?'':'dim'}">
         <div class="tl-era">${esc(e.era)}</div>
@@ -445,7 +446,7 @@ export async function renderDepots() {
   const [dep, src] = await Promise.all([api("/api/depots"), api("/api/sources")]);
   const dd = dep.depotdownloader ? `Found: ${esc(dep.depotdownloader)}` : "DepotDownloader not on PATH — manual commands only";
   document.getElementById("view").innerHTML = `
-    <h2 class="section-title">DEPOTS &amp; SOURCES</h2>
+    <h2 class="section-title">${t("route.depots")}</h2>
     <p class="muted" style="margin-bottom:12px">${dd}. Automated download uses server env <code>STEAM_USERNAME</code> / <code>STEAM_PASSWORD</code>.</p>
     <div class="grid cols-2">
       <div><h3 class="section-title" style="font-size:16px">Depots</h3>
@@ -501,7 +502,7 @@ export async function renderSearch(params) {
   const el = document.getElementById("view");
   const q = params.get("q") || "";
   el.innerHTML = `
-    <h2 class="section-title">SEARCH</h2>
+    <h2 class="section-title">${t("route.search")}</h2>
     <div class="form-row">
       <label class="field" style="flex:2"><input id="sq" value="${esc(q)}" placeholder="query"></label>
       <label class="toggle"><input type="checkbox" id="sq-fuzzy"> fuzzy</label>
@@ -542,7 +543,7 @@ export async function renderBookmarks() {
   const el = document.getElementById("view");
   const d = await api("/api/bookmarks");
   el.innerHTML = `
-    <h2 class="section-title">BOOKMARKS</h2>
+    <h2 class="section-title">${t("route.bookmarks")}</h2>
     <p class="section-sub">Quick QA list of entry ids (e.g. known-bad <code>559200</code>).</p>
     <div class="form-row">
       <input id="bm-add" placeholder="numeric id">
@@ -566,7 +567,7 @@ export async function renderPatch(params) {
   const files = await loadFiles();
   const mode = params.get("mode") || "build";
   document.getElementById("view").innerHTML = `
-    <h2 class="section-title">PATCH BUILDER</h2>
+    <h2 class="section-title">${t("route.patch")}</h2>
     <div class="form-row" style="margin-bottom:12px">
       <a class="btn ghost small ${mode==="build"?"active":""}" href="${routePath("patch", { mode: "build" })}">Build subset</a>
       <a class="btn ghost small ${mode==="apply"?"active":""}" href="${routePath("patch", { mode: "apply" })}">Apply patch</a>
@@ -610,7 +611,7 @@ export async function renderCampaigns() {
   const el = document.getElementById("view");
   const d = await api("/api/campaigns/ranges");
   el.innerHTML = `
-    <h2 class="section-title">CAMPAIGN RANGES</h2>
+    <h2 class="section-title">${t("route.campaigns")}</h2>
     <p class="section-sub">Approximate CoH1 id namespaces — use with patch builder / search.</p>
     <div class="grid cols-2">${Object.entries(d.campaigns).map(([pack, ranges]) => `
       <div class="card"><h3>${esc(pack.replace(/_/g, " "))}</h3>
@@ -633,7 +634,7 @@ export async function renderGames(params) {
     fid ? api(`/api/files/${fid}/game-profile`) : Promise.resolve(null),
   ]);
   el.innerHTML = `
-    <h2 class="section-title">GAME PROFILES</h2>
+    <h2 class="section-title">${t("route.games")}</h2>
     <p class="section-sub">CoH1 / CoH2 / Dawn of War UCS dialect hints.</p>
     <label class="field">Classify upload<select id="gp-file"><option value="">—</option>${fileOptions(files, fid)}</select></label>
     <div class="grid cols-2" style="margin-top:16px">
@@ -662,7 +663,7 @@ export async function renderGames(params) {
 /* ------------------------------------------------------------- sga browser */
 export async function renderSga() {
   document.getElementById("view").innerHTML = `
-    <h2 class="section-title">SGA BROWSER</h2>
+    <h2 class="section-title">${t("route.sga")}</h2>
     <p class="section-sub">Scan install archives; list internals; extract locale <code>.ucs</code> files.</p>
     <div class="form-row">
       <label class="field" style="flex:2">Install path<input id="sga-p" placeholder="C:\\Games\\Company of Heroes..."></label>
@@ -673,7 +674,7 @@ export async function renderSga() {
     <div id="sga-out"></div>`;
   document.getElementById("sga-locale").onclick = async () => {
     const install = document.getElementById("sga-p").value;
-    if (!install) { toast("Enter install path"); return; }
+    if (!install) { toast(t("msg.enter_path")); return; }
     const d = await api(`/api/sga/locale-scan?install_path=${encodeURIComponent(install)}`);
     document.getElementById("sga-out").innerHTML = `
       <div class="banner">${d.count} archive(s) with locale UCS</div>
@@ -683,7 +684,7 @@ export async function renderSga() {
   };
   document.getElementById("sga-extract-all").onclick = async () => {
     const install = document.getElementById("sga-p").value;
-    if (!install) { toast("Enter install path"); return; }
+    if (!install) { toast(t("msg.enter_path")); return; }
     const d = await api("/api/sga/extract-locales", { method: "POST",
       body: JSON.stringify({ install_path: install }) });
     toast(`Extracted ${d.uploaded} UCS file(s)`);
@@ -786,7 +787,7 @@ export async function renderVerify(params) {
   const files = await loadFiles();
   const fid = params.get("file") || "";
   el.innerHTML = `
-    <h2 class="section-title">VERIFY CHECKLIST</h2>
+    <h2 class="section-title">${t("route.verify")}</h2>
     <p class="section-sub">Known-bad IDs (<code>559200</code>, <code>9419700</code>, ToV menus) — run before installing in-game.</p>
     <label class="field">File<select id="vf-file"><option value="">—</option>${fileOptions(files, fid)}</select></label>
     <button class="btn" id="vf-go">Run checklist</button>
@@ -824,7 +825,7 @@ export async function renderTranslation(params) {
   const files = await loadFiles();
   const fid = params.get("file") || "";
   document.getElementById("view").innerHTML = `
-    <h2 class="section-title">PO / TMX</h2>
+    <h2 class="section-title">${t("route.translation")}</h2>
     <p class="section-sub">Export for CAT tools (gettext PO, TMX 1.4); import translations back to UCS.</p>
     <label class="field">Template UCS<select id="tr-file"><option value="">—</option>${fileOptions(files, fid)}</select></label>
     <div class="form-row" style="margin-top:12px">
@@ -834,8 +835,8 @@ export async function renderTranslation(params) {
     <div class="card" style="margin-top:20px">
       <h3>Import PO or TMX</h3>
       <label class="field">Format<select id="tr-fmt"><option value="po">PO (gettext)</option><option value="tmx">TMX</option></select></label>
-      <textarea id="tr-text" rows="12" style="width:100%;font-family:var(--mono);background:var(--panel);color:var(--text);border:1px solid var(--border);padding:8px" placeholder="Paste .po or .tmx content"></textarea>
-      <button class="btn" id="tr-import" style="margin-top:8px">Import → new UCS</button>
+      <textarea id="tr-text" rows="12" placeholder="Paste .po or .tmx content"></textarea>
+      <button class="btn" id="tr-import" style="margin-top:8px">${t("btn.import_ucs")}</button>
       <div id="tr-out"></div>
     </div>`;
   const syncLinks = () => {
@@ -851,7 +852,7 @@ export async function renderTranslation(params) {
   document.getElementById("tr-import").onclick = async () => {
     const id = document.getElementById("tr-file").value;
     const text = document.getElementById("tr-text").value;
-    if (!id || !text) { toast("Pick file and paste content"); return; }
+    if (!id || !text) { toast(t("msg.pick_file_paste")); return; }
     const fmt = document.getElementById("tr-fmt").value;
     const body = fmt === "tmx" ? { tmx: text } : { po: text };
     const path = fmt === "tmx" ? "tmx" : "po";
@@ -867,10 +868,10 @@ export async function renderEditor(params) {
   const files = await loadFiles();
   const fid = params.get("file") || "";
   el.innerHTML = `
-    <h2 class="section-title">UCS EDITOR</h2>
+    <h2 class="section-title">${t("route.editor")}</h2>
     <p class="section-sub">Monaco editor with live lint. Save creates a new upload.</p>
     <label class="field">File<select id="ed-file"><option value="">—</option>${fileOptions(files, fid)}</select></label>
-    <div id="monaco" style="height:420px;border:1px solid var(--border);margin:12px 0"></div>
+    <div id="monaco" class="editor-pane"></div>
     <button class="btn" id="ed-save">Save as new upload</button>
     <div id="ed-sga" style="margin-top:12px"></div>
     <div id="ed-lint" class="banner" style="margin-top:12px"></div>`;
@@ -929,7 +930,7 @@ export async function renderEditor(params) {
   }
   document.getElementById("ed-save").onclick = async () => {
     const id = document.getElementById("ed-file").value;
-    if (!id || !editor) { toast("Load a file first"); return; }
+    if (!id || !editor) { toast(t("msg.load_file_first")); return; }
     const entries = editor.getValue().split(/\r?\n/).filter(Boolean).map(line => {
       const t = line.indexOf("\t");
       return t < 0 ? null : { key: parseInt(line.slice(0, t), 10), value: line.slice(t + 1) };
@@ -968,9 +969,9 @@ export async function renderSettings() {
     return "";
   };
   document.getElementById("view").innerHTML = `
-    <h2 class="section-title">SETTINGS</h2>
+    <h2 class="section-title">${t("route.settings")}</h2>
     <div class="card" style="max-width:480px;margin-bottom:16px">
-      <h3 style="font-size:14px;margin:0 0 10px">Authentication</h3>
+      <h3 style="font-size:14px;margin:0 0 10px">${t("settings.auth")}</h3>
       ${isHybridUi() ? `<p class="muted" style="font-size:13px;margin-bottom:10px">
         <strong>Hybrid UI</strong> (GitHub Pages + Fly API): use the <em>API key</em> field below for uploads and merges.
         Browser cookies and OAuth sign-in only work on the same-origin monolith (<code>fly.dev</code> or localhost).
@@ -978,34 +979,34 @@ export async function renderSettings() {
       ${auth.authenticated
         ? `<p>Signed in as <strong>${esc(auth.user || "")}</strong> (${esc(auth.method || "")})</p>
            ${sessionHint()}
-           <button class="btn ghost small" id="auth-logout">Sign out</button>`
+           <button class="btn ghost small" id="auth-logout">${t("btn.sign_out")}</button>`
         : auth.auth_enabled
-          ? `<p class="muted" style="font-size:13px">Server requires login or API key for uploads and merges.</p>
+          ? `<p class="muted" style="font-size:13px">${t("settings.auth_required")}</p>
              <label class="field">Username<input id="auth-user" autocomplete="username"></label>
              <label class="field" style="margin-top:8px">Password<input type="password" id="auth-pass" autocomplete="current-password"></label>
-             <button class="btn small" id="auth-login" style="margin-top:10px">Sign in</button>
-             ${auth.oauth_configured ? `<a class="btn ghost small" href="${apiUrl("/api/auth/oauth/login")}" style="margin-left:8px">OAuth</a>` : ""}`
-          : `<p class="muted" style="font-size:13px">No server auth configured.</p>`}
+             <button class="btn small" id="auth-login" style="margin-top:10px">${t("btn.sign_in")}</button>
+             ${auth.oauth_configured ? `<a class="btn ghost small" href="${apiUrl("/api/auth/oauth/login")}" style="margin-left:8px">${t("btn.oauth")}</a>` : ""}`
+          : `<p class="muted" style="font-size:13px">${t("settings.auth_none")}</p>`}
     </div>
     <div class="card" style="max-width:480px">
-      <label class="toggle"><input type="checkbox" id="theme-t" ${theme==="light"?"checked":""}> Light theme</label>
-      <label class="field" style="margin-top:16px">UI language
+      <label class="toggle"><input type="checkbox" id="theme-t" ${theme==="light"?"checked":""}> ${t("settings.theme")}</label>
+      <label class="field" style="margin-top:16px">${t("settings.language")}
         <select id="ui-lang"><option value="en">English</option><option value="fr">Français</option><option value="ar">العربية</option></select>
       </label>
-      <label class="field" style="margin-top:16px">API key (for uploads/merge when server requires it)
-        <input type="password" id="api-key" placeholder="X-API-Key" autocomplete="off" style="width:100%;margin-top:6px;padding:8px;background:var(--panel);border:1px solid var(--border);color:var(--text)">
+      <label class="field" style="margin-top:16px">${t("settings.api_key")}
+        <input type="password" id="api-key" class="input-block" placeholder="X-API-Key" autocomplete="off">
       </label>
       <p class="muted" style="font-size:12px;margin-top:8px">Stored in this browser only (<code>localStorage</code>).
         Public API may rate-limit by IP (~30 req/min, stricter on uploads).</p>
       <p style="margin-top:16px"><a href="${apiUrl("/docs")}" target="_blank">OpenAPI docs (/docs)</a> ·
         <a href="${apiUrl("/api/export/openapi-client")}" target="_blank">Client snippets</a></p>
-      <button class="btn ghost small" id="dup-probe" style="margin-top:12px">Generate duplicate-ID probe</button>
+      <button class="btn ghost small" id="dup-probe" style="margin-top:12px">${t("btn.dup_probe")}</button>
       <div id="dup-out"></div>
     </div>
     <div class="card" style="max-width:720px;margin-top:16px">
       <h3 style="font-size:14px;margin:0 0 10px">Webhook delivery log</h3>
       <button class="btn ghost small" id="wh-retry" style="margin-bottom:8px">Retry dead letters</button>
-      <div id="wh-log"><div class="loading">Loading</div></div>
+      <div id="wh-log"><div class="loading">${t("msg.loading")}</div></div>
     </div>`;
   const renderWhLog = async () => {
     try {
@@ -1041,7 +1042,7 @@ export async function renderSettings() {
             username: document.getElementById("auth-user").value,
             password: document.getElementById("auth-pass").value,
           }) });
-        toast("Signed in");
+        toast(t("msg.signed_in"));
         renderSettings();
       } catch (e) { toast(e.message); }
     };
@@ -1050,7 +1051,7 @@ export async function renderSettings() {
   if (logoutBtn) {
     logoutBtn.onclick = async () => {
       await api("/api/auth/logout", { method: "POST" });
-      toast("Signed out");
+      toast(t("msg.signed_out"));
       renderSettings();
     };
   }
@@ -1064,11 +1065,12 @@ export async function renderSettings() {
     const light = e.target.checked;
     document.documentElement.dataset.theme = light ? "light" : "dark";
     localStorage.setItem("coh-theme", light ? "light" : "dark");
+    applyColorScheme(light ? "light" : "dark");
   };
   document.getElementById("ui-lang").value = lang;
-  document.getElementById("ui-lang").onchange = e => {
-    localStorage.setItem("coh-ui-lang", e.target.value);
-    toast("Language saved — reload to apply nav labels");
+  document.getElementById("ui-lang").onchange = async e => {
+    await setLocale(e.target.value);
+    toast(t("msg.language_saved"));
   };
   const keyInput = document.getElementById("api-key");
   keyInput.value = localStorage.getItem("coh-api-key") || "";
@@ -1076,7 +1078,7 @@ export async function renderSettings() {
     const v = e.target.value.trim();
     if (v) localStorage.setItem("coh-api-key", v);
     else localStorage.removeItem("coh-api-key");
-    toast("API key saved");
+    toast(t("msg.api_key_saved"));
   };
 }
 
@@ -1086,7 +1088,7 @@ export async function renderAbout() {
   const faq = window.ABOUT_FAQ || [];
   el.innerHTML = `
     <article class="about-page">
-      <h2 class="section-title">ABOUT COH UCS TOOLS</h2>
+      <h2 class="section-title">${t("route.about")}</h2>
       <p class="section-sub">Open-source toolkit for <strong>Company of Heroes</strong> modders, translators, and archivists working with Relic <code>.ucs</code> localization files.</p>
 
       <div class="card about-lead">
@@ -1128,7 +1130,12 @@ export async function renderAbout() {
 }
 
 /* apply saved theme on load */
+function applyColorScheme(theme) {
+  document.documentElement.style.colorScheme = theme === "light" ? "light" : "dark";
+}
+
 export function initTheme() {
-  const t = localStorage.getItem("coh-theme");
-  if (t === "light") document.documentElement.dataset.theme = "light";
+  const theme = localStorage.getItem("coh-theme");
+  if (theme === "light") document.documentElement.dataset.theme = "light";
+  applyColorScheme(theme === "light" ? "light" : "dark");
 }
