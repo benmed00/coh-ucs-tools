@@ -201,4 +201,16 @@ Credentials and headers: `X-API-Key`, `Content-Type` are allowed for API key aut
 
 The static CDN serves only HTML/CSS/JS — no server-side state.
 
+### Troubleshooting GitHub Pages
+
+| Symptom | Cause | Fix |
+|---------|-------|-----|
+| Site shows **README markdown** instead of the dark UI | Source was **Deploy from a branch** (`master` / root) | Settings → Pages → Source: **GitHub Actions**. Or run `gh api repos/OWNER/REPO/pages -X PUT -f build_type=workflow` |
+| Red banner: custom domain **not properly formatted** | Invalid name like `company_of_heroes_translations` (no `.com`, underscores) | Leave **Custom domain** empty, or use a real FQDN e.g. `coh.example.com` and add DNS CNAME → `benmed00.github.io` |
+| Actions workflow **404** on deploy | Pages not set to GitHub Actions yet | Enable as above, then re-run **GitHub Pages** workflow |
+| Upload/merge returns **401** on the live UI | `UCS_API_KEY` set on Fly | Settings → paste API key (stored in browser `localStorage`) |
+
+After switching to GitHub Actions, wait ~1 minute and hard-refresh
+`https://benmed00.github.io/coh-ucs-tools/` — you should see **“UCS LOCALIZATION COMMAND CONSOLE”**, not the README.
+
 ---
