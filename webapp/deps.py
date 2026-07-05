@@ -77,6 +77,22 @@ LOCALE_VERSIONS: list[dict] = [
         "notes": "Requires recovered Spanish NSV from depot 4566.",
     },
     {
+        "id": "italian-complete",
+        "name": "RelicCOH.Italian.complete.ucs",
+        "path": Path("RelicCOH.Italian.complete.ucs"),
+        "origin": "Built by build_italian.py",
+        "completeness": "Official Italian NSV union + placeholders",
+        "notes": "Requires recovered Italian NSV from depot 4567.",
+    },
+    {
+        "id": "polish-complete",
+        "name": "RelicCOH.Polish.complete.ucs",
+        "path": Path("RelicCOH.Polish.complete.ucs"),
+        "origin": "Built by build_polish.py",
+        "completeness": "Official Polish NSV union + placeholders",
+        "notes": "Requires recovered Polish NSV from depot 4568.",
+    },
+    {
         "id": "arabic-mt",
         "name": "RelicCOH.Arabic.MT.ucs",
         "path": Path("RelicCOH.Arabic.MT.ucs"),
@@ -159,3 +175,25 @@ def _get_record(store: FileStore, file_id: str) -> StoredFile:
     if rec is None:
         raise HTTPException(404, f"No file with id {file_id!r}")
     return rec
+
+
+def raise_profile_strict(
+    store: FileStore,
+    file_ids: list[str],
+    game_profile: str,
+    strict_profile: bool,
+) -> None:
+    if not strict_profile:
+        return
+    from game_profiles import profile_strict_mismatches
+
+    items = [(fid, store.document(fid)) for fid in file_ids]
+    mismatches = profile_strict_mismatches(items, game_profile)
+    if mismatches:
+        raise HTTPException(
+            422,
+            detail={
+                "message": f"One or more files do not match profile {game_profile!r}",
+                "mismatches": mismatches,
+            },
+        )

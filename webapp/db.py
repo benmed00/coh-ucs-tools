@@ -96,6 +96,17 @@ CREATE TABLE IF NOT EXISTS webhooks (
     created_at REAL NOT NULL
 );
 
+CREATE TABLE IF NOT EXISTS webhook_deliveries (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    event TEXT NOT NULL,
+    url TEXT NOT NULL,
+    success INTEGER NOT NULL,
+    status_code INTEGER,
+    error TEXT DEFAULT '',
+    payload_json TEXT DEFAULT '{}',
+    created_at REAL NOT NULL
+);
+
 CREATE TABLE IF NOT EXISTS sessions (
     token TEXT PRIMARY KEY,
     user_label TEXT NOT NULL,
@@ -107,6 +118,7 @@ CREATE INDEX IF NOT EXISTS idx_uploads_kind ON uploads(kind);
 CREATE INDEX IF NOT EXISTS idx_uploads_project ON uploads(project_id);
 CREATE INDEX IF NOT EXISTS idx_audit_ts ON audit_log(ts);
 CREATE INDEX IF NOT EXISTS idx_mt_jobs_status ON mt_jobs(status);
+CREATE INDEX IF NOT EXISTS idx_webhook_deliveries_ts ON webhook_deliveries(created_at);
 """
 
 
@@ -122,6 +134,7 @@ class Database:
         self._conn.executescript(_SCHEMA)
         self._conn.commit()
         self._migrate_json_storage()
+        self._apply_schema_migrations()
 
     @contextmanager
     def cursor(self) -> Iterator[sqlite3.Cursor]:
@@ -238,6 +251,28 @@ class Database:
                     logger.info("Migrated %d upload record(s) from index.json", len(files))
             except (json.JSONDecodeError, OSError) as exc:
                 logger.warning("Upload index migration skipped: %s", exc)
+
+    def _apply_schema_migrations(self) -> None:
+        """Idempotent upgrades for databases created before new tables were added."""
+        if self.fetchone(
+            "SELECT name FROM sqlite_master WHERE type='table' AND name='webhook_deliveries'"
+        ):
+            return
+        with self.cursor() as cur:
+            cur.executescript("""
+                CREATE TABLE webhook_deliveries (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    event TEXT NOT NULL,
+                    url TEXT NOT NULL,
+                    success INTEGER NOT NULL,
+                    status_code INTEGER,
+                    error TEXT DEFAULT '',
+                    payload_json TEXT DEFAULT '{}',
+                    created_at REAL NOT NULL
+                );
+                CREATE INDEX IF NOT EXISTS idx_webhook_deliveries_ts ON webhook_deliveries(created_at);
+            """)
+        logger.info("Applied webhook_deliveries schema migration")
 
     def close(self) -> None:
         self._conn.close()

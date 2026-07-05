@@ -102,6 +102,27 @@ def subset_by_ranges(entries: dict[int, str], ranges: Sequence[str]) -> dict[int
     return {k: v for k, v in entries.items() if k in wanted}
 
 
+def apply_patch_overlay(
+    base: UcsDocument,
+    patch: UcsDocument,
+) -> tuple[dict[int, str], list[int], list[int]]:
+    """Overlay *patch* entries onto *base*.
+
+    Returns ``(merged_entries, changed_keys, added_keys)``.
+    """
+    merged = dict(base.entries)
+    changed: list[int] = []
+    added: list[int] = []
+    for key, value in patch.entries.items():
+        if key not in merged:
+            added.append(key)
+            merged[key] = value
+        elif merged[key] != value:
+            changed.append(key)
+            merged[key] = value
+    return merged, sorted(changed), sorted(added)
+
+
 def compare_tokens(a_val: str, b_val: str) -> Optional[TokenIssue]:
     """Return an issue when %token% counts differ between two values."""
     a_tokens = _TOKEN_RE.findall(a_val)
@@ -186,6 +207,31 @@ def diff_entries(
         rows.append(DiffRow(key=key, a_value=a_val, b_value=b_val, kind=kind))
 
     return rows
+
+
+def export_unified_diff(
+    a: UcsDocument,
+    b: UcsDocument,
+    *,
+    label_a: str = "a.ucs",
+    label_b: str = "b.ucs",
+    filters: DiffFilter | Sequence[DiffFilter] = ("changed", "missing"),
+) -> str:
+    """Return a unified diff of entry lines that differ between two UCS files."""
+    if isinstance(filters, str):
+        filter_set: Sequence[DiffFilter] = (filters,)
+    else:
+        filter_set = filters
+    rows = diff_entries(a, b, filter_set)
+    lines_a = [f"{r.key}\t{r.a_value or ''}" for r in rows]
+    lines_b = [f"{r.key}\t{r.b_value or ''}" for r in rows]
+    return "".join(
+        difflib.unified_diff(
+            lines_a, lines_b,
+            fromfile=label_a, tofile=label_b,
+            lineterm="",
+        )
+    )
 
 
 def fingerprint_file(source: Path | bytes) -> FileFingerprint:

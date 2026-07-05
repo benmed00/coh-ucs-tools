@@ -1,0 +1,79 @@
+[build-system]
+requires = ["setuptools>=69", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "coh-ucs-tools"
+version = "1.0.0"
+description = "Compare, validate, search and merge Company of Heroes .ucs localization files"
+readme = "README.md"
+license = { text = "MIT" }
+requires-python = ">=3.12"
+authors = [{ name = "coh-ucs-tools contributors" }]
+keywords = ["company-of-heroes", "localization", "ucs", "relic", "modding"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Environment :: Console",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: Microsoft :: Windows",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Games/Entertainment",
+    "Topic :: Text Processing",
+]
+dependencies = [
+    "chardet>=5.2.0",
+]
+
+[project.optional-dependencies]
+web = [
+    "fastapi==0.139.0",
+    "uvicorn==0.50.0",
+    "python-multipart==0.0.32",
+    "httpx==0.28.1",
+]
+redis = [
+    "redis>=5.0.0",
+]
+dev = [
+    "coh-ucs-tools[web]",
+]
+
+[project.scripts]
+coh-ucs = "cli:main"
+
+[project.urls]
+Homepage = "https://github.com/benmed00/coh-ucs-tools"
+Documentation = "https://github.com/benmed00/coh-ucs-tools/blob/master/docs/API.md"
+Repository = "https://github.com/benmed00/coh-ucs-tools"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["webapp*"]
+
+[tool.setuptools]
+py-modules = [
+    "cli",
+    "parser",
+    "validator",
+    "ucs_stats",
+    "merge",
+    "translate",
+    "ucs_analysis",
+    "po_io",
+    "sga_reader",
+    "game_profiles",
+    "build_french",
+    "build_arabic",
+    "build_german",
+    "build_spanish",
+    "locale_build",
+    "verification_checklist",
+    "duplicate_probe",
+    "depot_downloader",
+    "build_italian",
+    "build_polish",
+    "locale_coverage",
+    "patch_chain",
+]

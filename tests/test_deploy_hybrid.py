@@ -47,6 +47,37 @@ class CorsTests(unittest.TestCase):
         self.assertEqual(res.status_code, 200)
         self.assertEqual(res.headers.get("access-control-allow-origin"), origin)
 
+    def test_cors_github_pages_on_versions(self) -> None:
+        origin = "https://benmed00.github.io"
+        res = self.client.get("/api/versions", headers={"Origin": origin})
+        self.assertEqual(res.status_code, 200)
+        self.assertEqual(res.headers.get("access-control-allow-origin"), origin)
+
+    def test_cors_on_auth_error(self) -> None:
+        prev = os.environ.get("UCS_API_KEY")
+        os.environ["UCS_API_KEY"] = "test-secret"
+        try:
+            from importlib import reload
+            import webapp.main as main_mod
+
+            reload(main_mod)
+            from fastapi.testclient import TestClient
+
+            with TestClient(main_mod.app) as client:
+                origin = "https://benmed00.github.io"
+                res = client.post("/api/files", headers={"Origin": origin})
+                self.assertEqual(res.status_code, 401)
+                self.assertEqual(res.headers.get("access-control-allow-origin"), origin)
+        finally:
+            if prev is None:
+                os.environ.pop("UCS_API_KEY", None)
+            else:
+                os.environ["UCS_API_KEY"] = prev
+            from importlib import reload
+            import webapp.main as main_mod
+
+            reload(main_mod)
+
 
 class BuildStaticTests(unittest.TestCase):
     def test_build_static_output(self) -> None:
@@ -54,7 +85,7 @@ class BuildStaticTests(unittest.TestCase):
 
         with tempfile.TemporaryDirectory() as tmp:
             out = Path(tmp) / "dist"
-            build_static(out, "https://coh-ucs-tools.fly.dev")
+            build_static(out, "https://coh-ucs-tools.fly.dev", "https://benmed00.github.io/coh-ucs-tools")
             self.assertTrue((out / "index.html").is_file())
             self.assertTrue((out / "css" / "app.css").is_file())
             self.assertTrue((out / "js" / "core.js").is_file())

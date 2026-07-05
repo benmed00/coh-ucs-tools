@@ -62,9 +62,9 @@ class ExtendedWebAppTests(unittest.TestCase):
         res = self.client.get("/api/languages")
         self.assertEqual(res.status_code, 200)
         langs = res.json()["languages"]
-        self.assertEqual(len(langs), 4)
+        self.assertEqual(len(langs), 8)
         codes = {l["code"] for l in langs}
-        self.assertEqual(codes, {"EN", "FR", "AR", "RU"})
+        self.assertEqual(codes, {"EN", "FR", "DE", "ES", "IT", "PL", "AR", "RU"})
 
     def test_bookmarks_crud(self) -> None:
         res = self.client.post("/api/bookmarks", json={"ids": [559200, 9419700]})
@@ -188,6 +188,76 @@ class ExtendedWebAppTests(unittest.TestCase):
         self.assertEqual(res.status_code, 200)
         lst = self.client.get("/api/projects")
         self.assertTrue(any(p["name"] == "QA workspace" for p in lst.json()["projects"]))
+
+    def test_verify_checklist(self) -> None:
+        f = self.upload("verify.ucs", {
+            559200: "Invasion of Normandy",
+            9419700: "Causeway",
+            1050: "New Army",
+            5000: "Back",
+            17000: "Delete Profile",
+            250: "x",
+            1: "%1%",
+            713520: "MULTIPLAYER",
+            713521: "OPTIONS",
+            713530: "CONTINUE",
+            713540: "SELECT MISSION",
+            713544: "OPERATIONS",
+            713525: "Tales of Valor",
+            9391740: "Falaise Pocket",
+        })
+        res = self.client.get(f"/api/files/{f['id']}/verify")
+        self.assertEqual(res.status_code, 200)
+        body = res.json()
+        self.assertTrue(body["ok"])
+        self.assertEqual(body["failed"], 0)
+
+    def test_tmx_export_import(self) -> None:
+        f = self.upload("tmx-src.ucs", {1: "one", 2: "two"})
+        res = self.client.get(f"/api/files/{f['id']}/tmx")
+        self.assertEqual(res.status_code, 200)
+        self.assertIn("<tmx", res.text)
+        imp = self.client.post(
+            f"/api/files/{f['id']}/tmx",
+            json={"tmx": res.text},
+        )
+        self.assertEqual(imp.status_code, 200)
+        self.assertEqual(imp.json()["keys"], 2)
+
+    def test_patch_apply(self) -> None:
+        base = self.upload("base.ucs", {1: "one", 2: "two"})
+        patch = self.upload("patch.ucs", {2: "TWO", 3: "three"})
+        res = self.client.post("/api/patch/apply", json={
+            "base_id": base["id"], "patch_id": patch["id"],
+        })
+        self.assertEqual(res.status_code, 200)
+        body = res.json()
+        self.assertEqual(body["changed"], 1)
+        self.assertEqual(body["added"], 1)
+
+    def test_duplicate_probe_api(self) -> None:
+        res = self.client.post("/api/tools/duplicate-probe")
+        self.assertEqual(res.status_code, 200)
+        self.assertIn("download_url", res.json())
+        self.assertIn("instructions", res.json())
+
+    def test_game_profile_classify(self) -> None:
+        f = self.upload("gp.ucs", {1: "a", 559200: "Normandy", 500000: "x"})
+        res = self.client.get(f"/api/files/{f['id']}/game-profile")
+        self.assertEqual(res.status_code, 200)
+        self.assertIn("classification", res.json())
+
+    def test_sga_locale_scan_empty(self) -> None:
+        import tempfile
+        with tempfile.TemporaryDirectory() as tmp:
+            res = self.client.get("/api/sga/locale-scan", params={"install_path": tmp})
+            self.assertEqual(res.status_code, 200)
+            self.assertEqual(res.json()["count"], 0)
+
+    def test_depot_german_instructions(self) -> None:
+        res = self.client.post("/api/depot/fetch-instructions", json={"language": "german"})
+        self.assertEqual(res.status_code, 200)
+        self.assertIn("4564", res.json()["command"])
 
 
 if __name__ == "__main__":

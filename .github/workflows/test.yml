@@ -8,10 +8,11 @@ on:
 
 jobs:
   test:
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        python-version: ["3.12"]
+        os: [ubuntu-latest, windows-latest]
+        python-version: ["3.11", "3.12", "3.13"]
     steps:
       - uses: actions/checkout@v4
       - name: Set up Python
@@ -40,6 +41,8 @@ jobs:
           pip install -r requirements.txt
           pip install playwright
           playwright install chromium
+      - name: E2E auth and API smoke
+        run: python scripts/e2e_playwright.py
       - name: Screenshot dashboard
         run: |
           python -m uvicorn webapp.main:app --host 127.0.0.1 --port 8000 &
@@ -57,4 +60,6 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: dashboard-screenshot
-          path: dashboard.png
+          path: |
+            dashboard.png
+            e2e-dashboard.png

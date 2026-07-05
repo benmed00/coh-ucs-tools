@@ -63,6 +63,15 @@ class PoIoTests(unittest.TestCase):
         self.assertEqual(entries[1], "one")
         self.assertEqual(entries[2], "two %1%")
 
+    def test_roundtrip_tmx(self):
+        from po_io import export_tmx, import_tmx
+
+        doc = make_doc({42: "hello", 99: "world %1%"})
+        tmx = export_tmx(doc, source_lang="en", target_lang="de")
+        entries = import_tmx(tmx)
+        self.assertEqual(entries[42], "hello")
+        self.assertEqual(entries[99], "world %1%")
+
 
 class ThreewayMergeTests(unittest.TestCase):
     def test_prefer_a_strategy(self):

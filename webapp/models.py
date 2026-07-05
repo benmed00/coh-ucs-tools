@@ -35,6 +35,8 @@ class UploadResponse(BaseModel):
 
     file: FileSummary
     message: str = Field(examples=["Parsed 22523 entries"])
+    game_profile: Optional[dict] = Field(default=None, description="Heuristic game-variant classification")
+    profile_check: Optional[dict] = Field(default=None, description="Validation against requested profile")
 
 
 class Entry(BaseModel):
@@ -228,6 +230,31 @@ class LanguageHubResponse(BaseModel):
     reference_id: Optional[str] = None
 
 
+class LocaleCoverageRowModel(BaseModel):
+    code: str
+    name: str
+    path: str
+    found: bool
+    keys: int
+    reference_keys: int
+    common_keys: int
+    missing_vs_reference: int
+    extra_keys: int
+    coverage_percent: float
+    placeholders: int
+    empty_values: int
+    gap_ranges: list[str]
+    gap_range_count: int
+
+
+class LocaleCoverageResponse(BaseModel):
+    reference_path: str
+    reference_keys: int
+    reference_found: bool
+    locales: list[LocaleCoverageRowModel]
+    error: Optional[str] = None
+
+
 class MergePreviewRequest(BaseModel):
     target_id: str
     source_id: str
@@ -291,6 +318,23 @@ class TimelineEntry(BaseModel):
 
 class TimelineResponse(BaseModel):
     entries: list[TimelineEntry]
+
+
+class PatchChainStep(BaseModel):
+    id: str
+    label: str
+    available: bool
+    keys: int
+    from_id: Optional[str] = None
+    added: int = 0
+    changed: int = 0
+    removed: int = 0
+    keys_delta: Optional[int] = None
+
+
+class PatchChainResponse(BaseModel):
+    chain: list[PatchChainStep]
+    reference: dict
 
 
 class DepotCard(BaseModel):
@@ -358,6 +402,19 @@ class PatchBuildResponse(BaseModel):
     download_url: str
     keys: int
     changelog_tsv: Optional[str] = None
+
+
+class PatchApplyRequest(BaseModel):
+    base_id: str
+    patch_id: str
+
+
+class PatchApplyResponse(BaseModel):
+    download_id: str
+    download_url: str
+    keys: int
+    changed: int
+    added: int
 
 
 class SgaFileInfo(BaseModel):

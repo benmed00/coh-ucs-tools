@@ -242,6 +242,11 @@ def run_batch_compare(file_ids: list[str], store) -> BatchJob:
     with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED) as zf:
         zf.writestr("report.json", json.dumps(asdict(job), indent=2))
     audit_log("batch_compare", f"{len(file_ids)} files, {len(pairs)} pairs", file_id=job_id)
+    fire_webhooks("compare_complete", {
+        "job_id": job_id,
+        "file_ids": file_ids,
+        "pairs": len(pairs),
+    })
     return job
 
 
@@ -250,27 +255,49 @@ def batch_zip_path(job_id: str) -> Optional[Path]:
     return p if p.exists() else None
 
 
-def fire_webhooks(event: str, payload: dict) -> None:
-    """Fire registered webhooks (metadata only, no string content)."""
+def fire_webhooks(event: str, payload: dict) -> list[str]:
+    """Fire registered webhooks (metadata only, no string content). Returns URLs attempted."""
+    fired: list[str] = []
     try:
         import urllib.request
         from .db import get_db
         rows = get_db().fetchall("SELECT url, events FROM webhooks")
+        now = time.time()
         for row in rows:
             events = json.loads(row["events"] or "[]")
             if event not in events:
                 continue
+            fired.append(row["url"])
             body = json.dumps({"event": event, **payload}).encode()
             req = urllib.request.Request(
                 row["url"], data=body, method="POST",
                 headers={"Content-Type": "application/json"},
             )
+            status_code: int | None = None
+            error = ""
+            success = False
             try:
-                urllib.request.urlopen(req, timeout=5)
+                with urllib.request.urlopen(req, timeout=5) as resp:
+                    status_code = getattr(resp, "status", None) or resp.getcode()
+                    success = True
             except Exception as exc:
+                error = str(exc)
                 logger.warning("Webhook %s failed: %s", row["url"], exc)
+            try:
+                get_db().execute(
+                    """INSERT INTO webhook_deliveries
+                    (event, url, success, status_code, error, payload_json, created_at)
+                    VALUES (?,?,?,?,?,?,?)""",
+                    (
+                        event, row["url"], 1 if success else 0, status_code, error,
+                        json.dumps(payload), now,
+                    ),
+                )
+            except Exception as log_exc:
+                logger.warning("Webhook delivery log failed: %s", log_exc)
     except Exception:
         pass
+    return fired
 
 
 def cleanup_old_uploads(store, max_age_hours: float = 24) -> int:
