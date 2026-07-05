@@ -10,9 +10,10 @@ jobs:
   test:
     runs-on: ${{ matrix.os }}
     strategy:
+      fail-fast: false
       matrix:
-        os: [ubuntu-latest, windows-latest]
-        python-version: ["3.11", "3.12", "3.13"]
+        os: ${{ github.event_name == 'pull_request' && fromJSON('["ubuntu-latest"]') || fromJSON('["ubuntu-latest", "windows-latest"]') }}
+        python-version: ${{ github.event_name == 'pull_request' && fromJSON('["3.12"]') || fromJSON('["3.11", "3.12", "3.13"]') }}
     steps:
       - uses: actions/checkout@v4
       - name: Set up Python
@@ -65,3 +66,29 @@ jobs:
           path: |
             dashboard.png
             e2e-dashboard.png
+
+  summary:
+    name: CI summary
+    runs-on: ubuntu-latest
+    needs: [test, playwright]
+    if: always()
+    steps:
+      - name: Write workflow summary
+        env:
+          NEEDS_TEST: ${{ toJSON(needs.test) }}
+          NEEDS_PLAYWRIGHT: ${{ toJSON(needs.playwright) }}
+        run: |
+          {
+            echo "## Tests workflow summary"
+            echo ""
+            echo "| Job | Result |"
+            echo "|-----|--------|"
+            echo "| test (matrix) | ${{ needs.test.result }} |"
+            echo "| playwright | ${{ needs.playwright.result }} |"
+            echo ""
+            if [ "${{ needs.test.result }}" = "success" ] && [ "${{ needs.playwright.result }}" = "success" ]; then
+              echo "**All checks passed.** Fly Deploy runs after this workflow completes."
+            else
+              echo "**Some checks failed** — Fly Deploy is skipped until Tests is green."
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"

@@ -1,8 +1,10 @@
-# Deploy to Fly.io on push to master (requires FLY_API_TOKEN repo secret).
+# Deploy to Fly.io after Tests pass (requires FLY_API_TOKEN repo secret).
 name: Fly Deploy
 
 on:
-  push:
+  workflow_run:
+    workflows: [Tests]
+    types: [completed]
     branches: [master, main]
   workflow_dispatch:
 
@@ -10,11 +12,28 @@ jobs:
   deploy:
     name: Deploy app
     runs-on: ubuntu-latest
+    if: >
+      github.event_name == 'workflow_dispatch' ||
+      github.event.workflow_run.conclusion == 'success'
     concurrency: deploy-group
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || github.sha }}
 
-      - uses: superfly/flyctl-actions/setup-flyctl@master
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Pre-deploy import smoke
+        env:
+          PYTHONPATH: ${{ github.workspace }}
+        run: python -c "from webapp.main import app; print('import ok:', app.title)"
+
+      - uses: superfly/flyctl-actions/setup-flyctl@v1
 
       - name: Deploy to Fly.io
         run: flyctl deploy --remote-only

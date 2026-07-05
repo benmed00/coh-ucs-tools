@@ -3,7 +3,9 @@
 ![Python 3.12](https://img.shields.io/badge/python-3.12-blue)
 ![License: MIT](https://img.shields.io/badge/license-MIT-green)
 ![Tests](https://github.com/benmed00/coh-ucs-tools/actions/workflows/test.yml/badge.svg)
-![Tests local](https://img.shields.io/badge/tests-176%20passing-brightgreen)
+![Fly Deploy](https://github.com/benmed00/coh-ucs-tools/actions/workflows/fly-deploy.yml/badge.svg)
+![GitHub Pages](https://github.com/benmed00/coh-ucs-tools/actions/workflows/pages.yml/badge.svg)
+![Tests local](https://img.shields.io/badge/tests-185%20passing-brightgreen)
 
 Comparison, validation, search and migration tooling for Company of Heroes
 `.ucs` localization files (`RelicCOH.Russian.ucs` / `RelicCOH.English.ucs`) —

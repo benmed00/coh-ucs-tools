@@ -13,6 +13,12 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 
 
+def _wait_view(page, heading: str) -> None:
+    """Wait for SPA route to render a section heading in #view."""
+    page.wait_for_load_state("domcontentloaded")
+    page.locator("#view").get_by_role("heading", name=heading, exact=True).wait_for(state="visible", timeout=15000)
+
+
 def main() -> int:
     try:
         from playwright.sync_api import sync_playwright
@@ -39,7 +45,7 @@ def main() -> int:
             page = browser.new_page()
 
             page.goto(f"{base}/")
-            page.wait_for_timeout(1500)
+            page.wait_for_load_state("networkidle")
             assert page.title(), "page should have a title"
             assert page.locator("text=LOCALIZATION").first.is_visible()
 
@@ -77,25 +83,21 @@ def main() -> int:
 
             # UI routes — merge wizard
             page.goto(f"{base}/merge-wizard")
-            page.wait_for_timeout(1200)
-            assert page.locator("text=MERGE WIZARD").is_visible()
-            assert page.locator("text=Two-way").is_visible()
+            _wait_view(page, "MERGE WIZARD")
+            assert page.get_by_role("link", name="Two-way", exact=True).is_visible()
 
             # Depots page
             page.goto(f"{base}/depots")
-            page.wait_for_timeout(1200)
-            assert page.locator("text=DEPOTS").is_visible()
+            _wait_view(page, "DEPOTS & SOURCES")
 
             # Upload page shell
             page.goto(f"{base}/upload")
-            page.wait_for_timeout(1200)
-            assert page.locator("text=UPLOAD").is_visible()
+            _wait_view(page, "UPLOAD & ANALYZE")
             assert page.locator("#game-profile").is_visible()
 
             # Settings
             page.goto(f"{base}/settings")
-            page.wait_for_timeout(1200)
-            assert page.locator("text=SETTINGS").is_visible()
+            _wait_view(page, "SETTINGS")
 
             page.screenshot(path=str(ROOT / "e2e-dashboard.png"), full_page=True)
             browser.close()

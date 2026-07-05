@@ -69,9 +69,36 @@ If the app OOMs on large UCS uploads, bump to `512mb` (may exceed free tier).
 
 ### GitHub Actions (CI deploy)
 
+**Workflow order:** push to `master` runs **Tests** (unit matrix + Playwright E2E) and **GitHub Pages** in parallel. **Fly Deploy** runs only after **Tests** succeeds (`workflow_run`), with a pre-deploy import smoke check.
+
+| Workflow | File | Trigger |
+|----------|------|---------|
+| Tests | `.github/workflows/test.yml` | push / PR |
+| Fly Deploy | `.github/workflows/fly-deploy.yml` | after Tests success, or manual |
+| GitHub Pages | `.github/workflows/pages.yml` | push / manual |
+
 1. Create a deploy token: `fly tokens create deploy -a coh-ucs-tools`
-2. Add repo secret **`FLY_API_TOKEN`** in GitHub → Settings → Secrets.
-3. Push to `master` — workflow `.github/workflows/fly-deploy.yml` deploys automatically and runs a **CORS smoke test** (`Origin: https://benmed00.github.io`).
+2. Add repo secret **`FLY_API_TOKEN`** in GitHub → Settings → Secrets → Actions:
+
+   ```powershell
+   gh secret set FLY_API_TOKEN --body "PASTE_FlyV1_TOKEN"
+   ```
+
+3. Push to `master` — Fly Deploy runs after Tests pass and executes a **CORS smoke test** (`Origin: https://benmed00.github.io`).
+
+**Rotate `FLY_API_TOKEN` when expired** (Fly Deploy fails with `Error: unauthorized`):
+
+```powershell
+fly auth login
+fly tokens create deploy -a coh-ucs-tools -n "github-actions" -x 8760h
+gh secret set FLY_API_TOKEN --body "PASTE_NEW_TOKEN"
+```
+
+If the web UI blocks personal tokens (SSO org), use `fly tokens create deploy` via CLI — not Account → Access Tokens.
+
+**Avoid concurrent deploys:** do not run local `fly deploy` while the **Fly Deploy** GitHub Action is in progress (VM lease conflicts). The workflow uses `concurrency: deploy-group`.
+
+**GitHub Pages dual workflow:** the repo uses [pages.yml](.github/workflows/pages.yml) (`deploy-pages@v4`). GitHub may also show a dynamic `pages-build-deployment` run — if the custom **GitHub Pages** workflow succeeded, ignore transient failures on the dynamic one. Settings → Pages → Source must be **GitHub Actions** only.
 
 ### Retire duplicate Fly apps
 
