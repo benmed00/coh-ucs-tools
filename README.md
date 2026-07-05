@@ -3,7 +3,7 @@
 ![Python 3.12](https://img.shields.io/badge/python-3.12-blue)
 ![License: MIT](https://img.shields.io/badge/license-MIT-green)
 ![Tests](https://github.com/benmed00/coh-ucs-tools/actions/workflows/test.yml/badge.svg)
-![Tests local](https://img.shields.io/badge/tests-83%20passing-brightgreen)
+![Tests local](https://img.shields.io/badge/tests-176%20passing-brightgreen)
 
 Comparison, validation, search and migration tooling for Company of Heroes
 `.ucs` localization files (`RelicCOH.Russian.ucs` / `RelicCOH.English.ucs`) —
@@ -16,6 +16,18 @@ Born from a real problem: a Complete Edition install showing `$559200 No Key`
 in Tales of Valor menus. The full story — reverse engineering, the recovery
 of the official English localization, and its verification — is in
 [`docs/PROJECT_REPORT.md`](docs/PROJECT_REPORT.md).
+
+## Live demo
+
+| | URL |
+|---|-----|
+| **Web UI** (GitHub Pages) | <https://benmed00.github.io/coh-ucs-tools/> |
+| **REST API** (Fly.io) | <https://coh-ucs-tools.fly.dev> |
+| **API docs** | <https://coh-ucs-tools.fly.dev/docs> |
+
+The UI is static on GitHub Pages; it calls the Fly API cross-origin.
+Uploads and merges on the public API require an **`X-API-Key`** in Settings when
+`UCS_API_KEY` is configured on the server (see [Hybrid deployment](#hybrid-deployment-phase-1)).
 
 ## Table of contents
 

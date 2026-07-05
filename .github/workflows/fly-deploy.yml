@@ -20,3 +20,15 @@ jobs:
         run: flyctl deploy --remote-only
         env:
           FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+
+      - name: CORS smoke test (GitHub Pages → Fly API)
+        run: |
+          curl -sf -D /tmp/cors-headers.txt -o /dev/null \
+            -H "Origin: https://benmed00.github.io" \
+            https://coh-ucs-tools.fly.dev/api/health
+          grep -Fi "access-control-allow-origin: https://benmed00.github.io" /tmp/cors-headers.txt
+          curl -sf -D /tmp/cors-headers2.txt -o /dev/null \
+            -H "Origin: https://benmed00.github.io" \
+            https://coh-ucs-tools.fly.dev/api/versions
+          grep -Fi "access-control-allow-origin: https://benmed00.github.io" /tmp/cors-headers2.txt
+          echo "CORS OK for benmed00.github.io"

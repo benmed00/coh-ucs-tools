@@ -20,13 +20,26 @@ export function apiUrl(path) {
   return (window.API_BASE || "") + path;
 }
 
+/** True when static UI is on a CDN and API is on another origin (e.g. GitHub Pages + Fly). */
+export function isHybridUi() {
+  const base = window.API_BASE || "";
+  if (!base) return false;
+  try {
+    return new URL(base).origin !== window.location.origin;
+  } catch {
+    return true;
+  }
+}
+
 export async function api(path, opts = {}) {
   const headers = new Headers(opts.headers || {});
   const storedKey = localStorage.getItem("coh-api-key");
   if (storedKey && !headers.has("X-API-Key")) {
     headers.set("X-API-Key", storedKey);
   }
-  const res = await fetch(apiUrl(path), { credentials: "include", ...opts, headers });
+  // Cross-origin hybrid UI uses X-API-Key only — cookies/OAuth sessions need same-site monolith.
+  const credentials = isHybridUi() ? "omit" : "include";
+  const res = await fetch(apiUrl(path), { credentials, ...opts, headers });
   if (res.status === 204) return null;
   let body = null;
   try { body = await res.json(); } catch { /* non-JSON */ }

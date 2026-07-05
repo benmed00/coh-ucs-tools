@@ -41,4 +41,5 @@ jobs:
     steps:
       - name: Deploy to GitHub Pages
         id: deployment
+        # Pin @v4 — do not float to v5; matches stable Pages API surface.
         uses: actions/deploy-pages@v4

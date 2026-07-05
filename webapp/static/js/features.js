@@ -1,6 +1,6 @@
 /* Extended SPA sections — diff, languages, search, settings, etc. */
 
-import { api, apiUrl, esc, fmt, loadFiles, fileOptions, fileLabel, toast, destroyCharts, makeChart, CHART_COLORS, profileQueryString, profileBarHtml, bindProfileBar } from "./core.js";
+import { api, apiUrl, esc, fmt, loadFiles, fileOptions, fileLabel, isHybridUi, toast, destroyCharts, makeChart, CHART_COLORS, profileQueryString, profileBarHtml, bindProfileBar } from "./core.js";
 import { navigateRoute, routePath } from "./router.js";
 
 export function highlightTokens(text) {
@@ -168,6 +168,14 @@ export async function renderLanguages() {
     <p class="section-sub">Coverage vs reference (${fmt(d.reference_keys)} keys).
       <a href="${apiUrl("/api/languages/coverage.csv")}" class="btn ghost small" style="margin-left:8px">Export CSV</a>
     </p>
+    ${!(covMap.FR && covMap.FR.found) ? `
+    <div class="banner" style="margin-bottom:16px">
+      <strong>French UCS not on this server.</strong>
+      CoH1 had an official French release — recover
+      <code>RelicCOH.French.ucs</code> from Steam depot <strong>4565</strong> (Legacy Edition)
+      via DepotDownloader, save as <code>downloads/RelicCOH.French.NSV.ucs</code>, then run
+      <code>python build_french.py</code> locally. See README § French localization.
+    </div>` : ""}
     <div class="card" style="margin-bottom:16px">
       <h3 style="font-size:14px;margin:0 0 8px">Coverage comparison</h3>
       <div class="chart-box" style="height:220px"><canvas id="cov-bar"></canvas></div>
@@ -963,6 +971,10 @@ export async function renderSettings() {
     <h2 class="section-title">SETTINGS</h2>
     <div class="card" style="max-width:480px;margin-bottom:16px">
       <h3 style="font-size:14px;margin:0 0 10px">Authentication</h3>
+      ${isHybridUi() ? `<p class="muted" style="font-size:13px;margin-bottom:10px">
+        <strong>Hybrid UI</strong> (GitHub Pages + Fly API): use the <em>API key</em> field below for uploads and merges.
+        Browser cookies and OAuth sign-in only work on the same-origin monolith (<code>fly.dev</code> or localhost).
+      </p>` : ""}
       ${auth.authenticated
         ? `<p>Signed in as <strong>${esc(auth.user || "")}</strong> (${esc(auth.method || "")})</p>
            ${sessionHint()}
@@ -983,6 +995,8 @@ export async function renderSettings() {
       <label class="field" style="margin-top:16px">API key (for uploads/merge when server requires it)
         <input type="password" id="api-key" placeholder="X-API-Key" autocomplete="off" style="width:100%;margin-top:6px;padding:8px;background:var(--panel);border:1px solid var(--border);color:var(--text)">
       </label>
+      <p class="muted" style="font-size:12px;margin-top:8px">Stored in this browser only (<code>localStorage</code>).
+        Public API may rate-limit by IP (~30 req/min, stricter on uploads).</p>
       <p style="margin-top:16px"><a href="${apiUrl("/docs")}" target="_blank">OpenAPI docs (/docs)</a> ·
         <a href="${apiUrl("/api/export/openapi-client")}" target="_blank">Client snippets</a></p>
       <button class="btn ghost small" id="dup-probe" style="margin-top:12px">Generate duplicate-ID probe</button>

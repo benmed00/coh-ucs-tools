@@ -31,30 +31,30 @@ $env:Path += ";$env:USERPROFILE\.fly\bin"
 fly auth login
 
 # Create the app (name must be globally unique — edit fly.toml if taken)
-fly apps create coh-ucs-tools-benmed00
+fly apps create coh-ucs-tools
 
-# Persistent disk (1 GB) — same region as fly.toml primary_region
-fly volumes create coh_data --region cdg --size 1 -a coh-ucs-tools-benmed00
+# Persistent disk (1 GB) — same region as fly.toml primary_region (iad)
+fly volumes create coh_data --region iad --size 1 -a coh-ucs-tools
 
 # Optional API key (recommended for public deploy)
-fly secrets set UCS_API_KEY="change-me-to-a-long-random-string" -a coh-ucs-tools-benmed00
+fly secrets set UCS_API_KEY="change-me-to-a-long-random-string" -a coh-ucs-tools
 
 # Optional DeepL for MT lab
-# fly secrets set DEEPL_API_KEY="..." -a coh-ucs-tools-benmed00
+# fly secrets set DEEPL_API_KEY="..." -a coh-ucs-tools
 ```
 
 ### Deploy
 
 ```powershell
-fly deploy -a coh-ucs-tools-benmed00
+fly deploy -a coh-ucs-tools
 ```
 
-Your app will be at: **https://coh-ucs-tools-benmed00.fly.dev**
+Your app will be at: **https://coh-ucs-tools.fly.dev**
 
 ```powershell
-fly open -a coh-ucs-tools-benmed00
-fly logs -a coh-ucs-tools-benmed00
-fly status -a coh-ucs-tools-benmed00
+fly open -a coh-ucs-tools
+fly logs -a coh-ucs-tools
+fly status -a coh-ucs-tools
 ```
 
 ### Free tier notes
@@ -69,16 +69,28 @@ If the app OOMs on large UCS uploads, bump to `512mb` (may exceed free tier).
 
 ### GitHub Actions (CI deploy)
 
-1. Create a deploy token: `fly tokens create deploy -a coh-ucs-tools-benmed00`
+1. Create a deploy token: `fly tokens create deploy -a coh-ucs-tools`
 2. Add repo secret **`FLY_API_TOKEN`** in GitHub → Settings → Secrets.
-3. Push to `master` — workflow `.github/workflows/fly-deploy.yml` deploys automatically.
+3. Push to `master` — workflow `.github/workflows/fly-deploy.yml` deploys automatically and runs a **CORS smoke test** (`Origin: https://benmed00.github.io`).
+
+### Retire duplicate Fly apps
+
+If you created an earlier trial app (e.g. `coh-ucs-tools-benmed00`), remove it after migrating to `coh-ucs-tools`:
+
+```powershell
+fly apps destroy coh-ucs-tools-benmed00 --yes
+```
 
 ### What NOT to put on the server
 
 - Copyrighted game `.ucs` files (NSV English, complete union, etc.)
 - `downloads/mt_cache.json` or other translation caches
 
-Users upload their own files; built-in “versions” only register when paths exist on the host (empty on Fly — that is expected).
+Users upload their own files; built-in “versions” only register when paths exist on the host (empty on Fly — that is expected). The dashboard shows a banner in hybrid mode when no version files are on disk.
+
+**Hybrid auth:** GitHub Pages UI + Fly API uses **`X-API-Key`** (Settings) for protected mutations. Cookie/OAuth sessions require the monolith (same origin). The SPA omits `credentials: "include"` on cross-origin fetches.
+
+**Rate limits:** Per-IP limits apply on public API endpoints (stricter on uploads). Tune via `webapp/rate_limit.py` or set `REDIS_URL` for shared state.
 
 ---
 

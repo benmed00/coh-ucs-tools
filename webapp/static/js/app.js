@@ -4,7 +4,7 @@ import { applyRouteSeo } from "./seo.js";
 import { initNavLinks, navigateRoute, parseRoute, routePath } from "./router.js";
 
 import {
-  view, toast, api, apiUrl, esc, fmt, loadFiles, fileOptions, UCS_FACTS,
+  view, toast, api, apiUrl, esc, fmt, loadFiles, fileOptions, UCS_FACTS, isHybridUi,
   destroyCharts, makeChart, CHART_COLORS, exportChartPng,
   profileQueryString, profileBarHtml, bindProfileBar,
 } from "./core.js";
@@ -30,10 +30,19 @@ async function renderDashboard() {
   const maxKeys = Math.max(...versions.map(v => v.keys), 1);
   const uploads = files.filter(f => f.kind === "upload");
   const generated = files.filter(f => f.kind === "generated");
+  const onDisk = versions.filter(v => v.available);
+  const hybridBanner = isHybridUi() && onDisk.length === 0 ? `
+    <div class="banner" style="margin-bottom:20px">
+      <strong>Public API — no bundled game files.</strong>
+      This Fly.io host does not ship copyrighted <code>.ucs</code> files.
+      Built-in version cards appear only when files exist on the server disk.
+      <a href="${routePath("upload")}">Upload your UCS</a> or run the CLI locally with your game install paths.
+    </div>` : "";
 
   view.innerHTML = `
     <h2 class="section-title">DASHBOARD</h2>
     <p class="section-sub">Known Company of Heroes 1 <code>.ucs</code> versions registered on this server.</p>
+    ${hybridBanner}
     <div class="grid cols-2">
       ${versions.map(v => `
         <div class="card">

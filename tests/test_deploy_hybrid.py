@@ -103,6 +103,8 @@ class ApiUrlTests(unittest.TestCase):
         self.assertIn("export function apiUrl(path)", text)
         self.assertIn('return (window.API_BASE || "") + path', text)
         self.assertIn("fetch(apiUrl(path)", text)
+        self.assertIn("export function isHybridUi()", text)
+        self.assertIn('credentials = isHybridUi() ? "omit" : "include"', text)
 
 
 if __name__ == "__main__":
