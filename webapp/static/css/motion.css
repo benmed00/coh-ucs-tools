@@ -1,0 +1,158 @@
+/* Motion tokens and animation utilities (CoH UCS Tools SPA) */
+
+:root {
+  --motion-fast: 150ms;
+  --motion-base: 250ms;
+  --motion-slow: 400ms;
+  --motion-enter: 320ms;
+  --ease-out: cubic-bezier(.2, .8, .2, 1);
+  --ease-spring: cubic-bezier(.34, 1.4, .64, 1);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+  .radar-sweep { animation: none !important; }
+  .radar-ring-pulse { animation: none !important; }
+  .hero-scanline-pulse { animation: none !important; }
+}
+
+/* View enter (full route swap fallback) */
+@keyframes motionEnter {
+  from { opacity: 0; transform: translateY(12px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+#view.motion-enter > * {
+  animation: motionEnter var(--motion-enter) var(--ease-out) both;
+  animation-delay: calc(var(--stagger-i, 0) * 40ms);
+}
+
+/* Panel enter (patchHtml targets) */
+@keyframes motionPanelEnter {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.motion-panel-enter {
+  animation: motionPanelEnter var(--motion-base) var(--ease-out) both;
+}
+.motion-panel-enter .card,
+.motion-panel-enter .tool-card,
+.motion-panel-enter .banner,
+.motion-panel-enter .empty,
+.motion-panel-enter .grid > * {
+  animation: motionPanelEnter var(--motion-base) var(--ease-out) both;
+  animation-delay: calc(var(--stagger-i, 0) * 40ms);
+}
+
+/* Toast */
+@keyframes motionToastIn {
+  from { opacity: 0; transform: translate(-50%, 16px); }
+  to { opacity: 1; transform: translate(-50%, 0); }
+}
+@keyframes motionToastOut {
+  from { opacity: 1; transform: translate(-50%, 0); }
+  to { opacity: 0; transform: translate(-50%, 8px); }
+}
+.toast.motion-toast-in {
+  animation: motionToastIn var(--motion-base) var(--ease-out) both;
+}
+.toast.motion-toast-out {
+  animation: motionToastOut var(--motion-fast) var(--ease-out) both;
+}
+
+/* Banner / empty state */
+@keyframes motionBannerIn {
+  from { opacity: 0; transform: translateX(-8px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+.motion-banner-in {
+  animation: motionBannerIn var(--motion-base) var(--ease-out) both;
+}
+
+/* Loading shimmer skeleton */
+@keyframes motionShimmer {
+  from { background-position: -200% 0; }
+  to { background-position: 200% 0; }
+}
+.loading-skeleton {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 24px 0;
+  min-height: 480px;
+}
+.loading-skeleton > i {
+  display: block;
+  height: 14px;
+  border-radius: 4px;
+  background: linear-gradient(90deg, #ffffff08 25%, #ffffff14 50%, #ffffff08 75%);
+  background-size: 200% 100%;
+  animation: motionShimmer 1.4s linear infinite;
+}
+.loading-skeleton > i:nth-child(1) { width: 55%; height: 22px; }
+.loading-skeleton > i:nth-child(2) { width: 80%; }
+.loading-skeleton > i:nth-child(3) { width: 65%; }
+
+/* Loading radar inline spinner */
+.loading-radar {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+}
+.loading-radar::before {
+  content: "";
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  border: 1px solid var(--olive);
+  background: conic-gradient(from 0deg, #9acd6836, transparent 70deg);
+  animation: sweep 4s linear infinite;
+}
+
+/* Hero CSS fallback extras */
+.radar-ring-pulse {
+  position: absolute;
+  inset: 12%;
+  border-radius: 50%;
+  border: 1px solid var(--olive);
+  opacity: 0;
+  animation: radarPulse 3s ease-out infinite;
+  animation-delay: 1.5s;
+  pointer-events: none;
+}
+@keyframes radarPulse {
+  0% { opacity: 0.5; transform: scale(0.85); }
+  100% { opacity: 0; transform: scale(1.15); }
+}
+.hero-scanline-pulse {
+  animation: scanlinePulse 4s ease-in-out infinite;
+}
+@keyframes scanlinePulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.7; }
+}
+
+/* View Transitions API (route swap) */
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation-duration: var(--motion-enter);
+  animation-timing-function: var(--ease-out);
+}
+::view-transition-old(root) {
+  animation-name: vtFadeOut;
+}
+::view-transition-new(root) {
+  animation-name: vtFadeIn;
+}
+@keyframes vtFadeOut {
+  from { opacity: 1; }
+  to { opacity: 0; }
+}
+@keyframes vtFadeIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}

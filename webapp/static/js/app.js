@@ -3,7 +3,8 @@
 import { applyRouteSeo } from "./seo.js";
 import { initNavLinks, initSpaNav, navigateRoute, parseRoute, routePath, scrollToMain } from "./router.js";
 import { t, initI18n, applyShellI18n } from "./i18n.js";
-import { beginRoute, isRouteAbortError, patchHtml, q, setViewHtml } from "./routeScope.js";
+import { beginRoute, isRouteAbortError, patchHtml, q, setViewAnimate, setViewHtml } from "./routeScope.js";
+import { loadingSkeleton } from "./motion.js";
 
 import {
   view, toast, api, apiUrl, esc, fmt, loadFiles, fileOptions, UCS_FACTS, isHybridUi,
@@ -23,6 +24,15 @@ initTheme();
 initNavLinks();
 initSpaNav();
 initMobileNav();
+initTopbarScroll();
+
+function initTopbarScroll() {
+  const bar = document.querySelector(".topbar");
+  if (!bar) return;
+  const onScroll = () => bar.classList.toggle("is-scrolled", window.scrollY > 8);
+  window.addEventListener("scroll", onScroll, { passive: true });
+  onScroll();
+}
 
 function initMobileNav() {
   const toggle = document.getElementById("nav-toggle");
@@ -42,7 +52,7 @@ function initMobileNav() {
 
 /* ------------------------------------------------------------ dashboard */
 async function renderDashboard() {
-  if (!setViewHtml(`<div class="loading">${t("msg.scanning")}</div>`)) return;
+  if (!setViewHtml(loadingSkeleton(t("msg.scanning")), { animate: false })) return;
   const [versions, files] = await Promise.all([
     api("/api/versions").then(d => d.versions),
     loadFiles(),
@@ -331,6 +341,7 @@ async function renderMerge(params) {
 
 /* ---------------------------------------------------------------- tools */
 async function renderTools() {
+  if (!setViewHtml(loadingSkeleton(t("msg.loading")), { animate: false })) return;
   const tools = (await api("/api/tools")).tools;
   if (!setViewHtml(`
     <h2 class="section-title">${t("route.tools")}</h2>
@@ -372,12 +383,16 @@ const routes = {
   games: renderGames,
 };
 
+let prevRouteKey = null;
+
 async function route() {
   destroyCharts();
   beginRoute();
   const { name, params } = parseRoute();
   const handler = routes[name] || renderDashboard;
   const routeKey = routes[name] ? name : "dashboard";
+  setViewAnimate(routeKey !== prevRouteKey);
+  prevRouteKey = routeKey;
   applyRouteSeo(routeKey);
   applyShellI18n();
   document.querySelectorAll("#nav a[data-route]").forEach(a =>

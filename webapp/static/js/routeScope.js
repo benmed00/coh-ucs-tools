@@ -3,6 +3,13 @@
  * when the user navigates away before async handlers finish.
  */
 
+import {
+  animatePanelEnter,
+  animateViewEnter,
+  prefersReducedMotion,
+  viewTransition,
+} from "./motion.js";
+
 export class RouteAbortError extends Error {
   constructor() {
     super("Route superseded by navigation");
@@ -55,12 +62,27 @@ export function isRouteAbortError(err) {
     || err?.name === "AbortError";
 }
 
+let viewAnimate = true;
+
+/** Enable/disable view enter animation for the next setViewHtml calls (route change vs i18n/theme). */
+export function setViewAnimate(enabled) {
+  viewAnimate = enabled;
+}
+
 /** Replace #view markup when the current route is still active. */
-export function setViewHtml(html) {
+export function setViewHtml(html, { animate } = {}) {
   if (!routeAlive()) return false;
   const el = document.getElementById("view");
   if (!el) return false;
-  el.innerHTML = html;
+  const shouldAnimate = animate ?? viewAnimate;
+  const write = () => { el.innerHTML = html; };
+  if (!shouldAnimate || prefersReducedMotion()) {
+    write();
+    return true;
+  }
+  viewTransition(write).then(() => {
+    if (routeAlive()) animateViewEnter(el);
+  });
   return true;
 }
 
@@ -70,6 +92,7 @@ export function patchHtml(id, html) {
   const el = document.getElementById(id);
   if (!el) return false;
   el.innerHTML = html;
+  animatePanelEnter(el, html);
   return true;
 }
 

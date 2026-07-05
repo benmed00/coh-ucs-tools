@@ -3,6 +3,7 @@
 import { t, getLocaleTag } from "./i18n.js";
 import { routePath } from "./router.js";
 import { isRouteAbortError, routeAlive, routeSignal } from "./routeScope.js";
+import { showToast, prefersReducedMotion } from "./motion.js";
 
 /** Main content mount (lazy — safe if modules load before #view exists). */
 export function getView() {
@@ -35,10 +36,7 @@ export function esc(s) {
 }
 
 export function toast(msg, ms = 3200) {
-  toastEl.textContent = msg;
-  toastEl.hidden = false;
-  clearTimeout(toast._t);
-  toast._t = setTimeout(() => { toastEl.hidden = true; }, ms);
+  showToast(toastEl, msg, ms);
 }
 
 export function apiUrl(path) {
@@ -194,6 +192,9 @@ function configureChartDefaults() {
   window.Chart.defaults.color = "#8f8c77";
   window.Chart.defaults.borderColor = "#3a4028";
   window.Chart.defaults.font.family = '"IBM Plex Mono", monospace';
+  const dur = prefersReducedMotion() ? 0 : 600;
+  window.Chart.defaults.animation.duration = dur;
+  window.Chart.defaults.animation.easing = "easeOutQuart";
 }
 
 /** Lazy-load Chart.js on first chart render (compare / languages views). */

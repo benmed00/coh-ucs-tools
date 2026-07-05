@@ -1,10 +1,13 @@
-const CACHE = "coh-ucs-v7";
+const CACHE = "coh-ucs-v11";
 const ASSETS = [
   "/",
   "/static/css/fonts.css",
   "/static/css/app.css",
+  "/static/css/motion.css",
   "/static/js/config.js",
   "/static/js/router.js",
+  "/static/js/routeScope.js",
+  "/static/js/motion.js",
   "/static/js/seo.js",
   "/static/js/i18n.js",
   "/static/js/app.js",

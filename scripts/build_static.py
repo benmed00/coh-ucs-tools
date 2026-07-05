@@ -49,16 +49,18 @@ def _rewrite_static_paths(text: str, *, base_path: str = "", depth: int = 0) -> 
     return text
 
 
-_SW_CACHE = "coh-ucs-v10"
+_SW_CACHE = "coh-ucs-v11"
 
 # Service-worker cache list uses absolute /static/ paths in source.
 _SW_ASSETS = (
     "/",
     "./css/fonts.css",
     "./css/app.css",
+    "./css/motion.css",
     "./js/config.js",
     "./js/router.js",
     "./js/routeScope.js",
+    "./js/motion.js",
     "./js/seo.js",
     "./js/i18n.js",
     "./js/app.js",

@@ -4,6 +4,10 @@
 const canvas = document.getElementById("hero-canvas");
 const fallback = document.getElementById("hero-fallback");
 
+function prefersReducedMotion() {
+  return window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+}
+
 function showFallback() {
   if (canvas) canvas.remove();
   if (fallback) fallback.hidden = false;
@@ -28,6 +32,7 @@ async function boot() {
     showFallback(); return; // offline / CDN blocked
   }
 
+  const reduced = prefersReducedMotion();
   const AMBER = 0xffb648, OLIVE = 0x8a9a5b, GREEN = 0x9acd68;
 
   const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
@@ -37,22 +42,18 @@ async function boot() {
   const camera = new THREE.PerspectiveCamera(42, 2, 0.1, 100);
   camera.position.set(0, 1.1, 6.2);
   camera.lookAt(0, 0, 0);
+  const cameraBaseX = camera.position.x;
 
   const rig = new THREE.Group();
-  // shift the composition to the right so the hero copy stays readable
   rig.position.x = 1.9;
   scene.add(rig);
 
-  // --- wireframe globe -------------------------------------------------
   const globe = new THREE.Group();
   rig.add(globe);
   const sphereGeo = new THREE.IcosahedronGeometry(1.5, 2);
-  globe.add(new THREE.LineSegments(
-    new THREE.WireframeGeometry(sphereGeo),
-    new THREE.LineBasicMaterial({ color: OLIVE, transparent: true, opacity: 0.42 }),
-  ));
+  const wireMat = new THREE.LineBasicMaterial({ color: OLIVE, transparent: true, opacity: 0.42 });
+  globe.add(new THREE.LineSegments(new THREE.WireframeGeometry(sphereGeo), wireMat));
 
-  // locale markers with language codes — click navigates to language hub
   const locales = [
     ["DE", 52.5, 13.4], ["FR", 48.9, 2.4], ["EN", 51.5, -0.1],
     ["RU", 55.8, 37.6], ["ES", 40.4, -3.7], ["AR", 24.7, 46.7],
@@ -63,45 +64,66 @@ async function boot() {
   const raycaster = new THREE.Raycaster();
   const pointer = new THREE.Vector2();
   const markers = [];
-  for (const [code, lat, lon] of locales) {
+  for (let i = 0; i < locales.length; i++) {
+    const [code, lat, lon] = locales[i];
     const phi = (90 - lat) * Math.PI / 180;
     const theta = (lon + 180) * Math.PI / 180;
-    const m = new THREE.Mesh(markerGeo, new THREE.MeshBasicMaterial({ color: AMBER }));
+    const mat = new THREE.MeshBasicMaterial({ color: AMBER });
+    const m = new THREE.Mesh(markerGeo, mat);
     m.position.setFromSphericalCoords(1.52, phi, theta);
-    m.userData = { code };
+    m.userData = { code, phase: i * 0.7 };
     globe.add(m);
     markers.push(m);
   }
   canvas.style.cursor = "grab";
-  canvas.addEventListener("click", (ev) => {
+  let hoveredMarker = null;
+  function pickMarker(ev) {
     const rect = canvas.getBoundingClientRect();
     pointer.x = ((ev.clientX - rect.left) / rect.width) * 2 - 1;
     pointer.y = -((ev.clientY - rect.top) / rect.height) * 2 + 1;
     raycaster.setFromCamera(pointer, camera);
-    const hits = raycaster.intersectObjects(markers);
-    if (hits.length) {
-      window.dispatchEvent(new CustomEvent("coh-locale-click", { detail: hits[0].object.userData.code }));
+    return raycaster.intersectObjects(markers)[0]?.object ?? null;
+  }
+  canvas.addEventListener("mousemove", (ev) => {
+    const hit = pickMarker(ev);
+    if (hoveredMarker && hoveredMarker !== hit) {
+      hoveredMarker.material.color.setHex(AMBER);
+    }
+    hoveredMarker = hit;
+    if (hoveredMarker) {
+      hoveredMarker.material.color.setHex(0xffe0a0);
+      canvas.style.cursor = "pointer";
+    } else {
+      canvas.style.cursor = "grab";
+    }
+  });
+  canvas.addEventListener("mouseleave", () => {
+    if (hoveredMarker) hoveredMarker.material.color.setHex(AMBER);
+    hoveredMarker = null;
+    canvas.style.cursor = "grab";
+  });
+  canvas.addEventListener("click", (ev) => {
+    const hit = pickMarker(ev);
+    if (hit) {
+      window.dispatchEvent(new CustomEvent("coh-locale-click", { detail: hit.userData.code }));
     }
   });
 
-  // --- radar ring + sweep ----------------------------------------------
   const radar = new THREE.Group();
   radar.position.y = -1.75;
   radar.rotation.x = -Math.PI / 2.15;
   rig.add(radar);
 
   for (const r of [0.9, 1.5, 2.1, 2.7]) {
-    const ring = new THREE.LineLoop(
+    radar.add(new THREE.LineLoop(
       new THREE.BufferGeometry().setFromPoints(
         Array.from({ length: 64 }, (_, i) => {
           const a = (i / 64) * Math.PI * 2;
           return new THREE.Vector3(Math.cos(a) * r, Math.sin(a) * r, 0);
         })),
       new THREE.LineBasicMaterial({ color: OLIVE, transparent: true, opacity: 0.28 }),
-    );
-    radar.add(ring);
+    ));
   }
-  // sweep wedge
   const sweepShape = new THREE.Shape();
   sweepShape.moveTo(0, 0);
   sweepShape.absarc(0, 0, 2.7, 0, Math.PI / 5, false);
@@ -111,13 +133,24 @@ async function boot() {
     new THREE.MeshBasicMaterial({ color: GREEN, transparent: true, opacity: 0.14, side: THREE.DoubleSide }),
   );
   radar.add(sweep);
-  const needle = new THREE.Line(
+  sweep.add(new THREE.Line(
     new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(0, 0, 0), new THREE.Vector3(2.7, 0, 0)]),
     new THREE.LineBasicMaterial({ color: GREEN, transparent: true, opacity: 0.7 }),
-  );
-  sweep.add(needle);
+  ));
 
-  // --- compass rose (low-poly, flat) -------------------------------------
+  const blips = [];
+  const blipGeo = new THREE.CircleGeometry(0.08, 12);
+  for (let i = 0; i < 4; i++) {
+    const blip = new THREE.Mesh(blipGeo, new THREE.MeshBasicMaterial({
+      color: GREEN, transparent: true, opacity: 0, side: THREE.DoubleSide,
+    }));
+    blip.position.set((Math.random() - 0.5) * 4, (Math.random() - 0.5) * 4, 0.01);
+    blip.userData = { life: 0 };
+    radar.add(blip);
+    blips.push(blip);
+  }
+  let lastSweepAngle = 0;
+
   const rose = new THREE.Group();
   rose.position.set(-2.6, 0.4, 0.4);
   rose.scale.setScalar(0.55);
@@ -133,7 +166,6 @@ async function boot() {
       new THREE.BufferGeometry().setFromPoints([left, tip, right]), roseMat));
   }
 
-  // --- render loop -------------------------------------------------------
   function resize() {
     const { clientWidth: w, clientHeight: h } = canvas.parentElement;
     renderer.setSize(w, h, false);
@@ -147,16 +179,38 @@ async function boot() {
   const clock = new THREE.Clock();
   function frame() {
     const t = clock.getElapsedTime();
-    globe.rotation.y = t * 0.18;
-    globe.rotation.x = Math.sin(t * 0.11) * 0.08;
-    sweep.rotation.z = -t * 1.1;
-    rose.rotation.z = Math.sin(t * 0.4) * 0.15;
+    if (!reduced) {
+      globe.rotation.y = t * 0.18;
+      globe.rotation.x = Math.sin(t * 0.11) * 0.08;
+      sweep.rotation.z = -t * 1.1;
+      rose.rotation.z = Math.sin(t * 0.4) * 0.15;
+      wireMat.opacity = 0.36 + Math.sin(t * 0.9) * 0.08;
+      camera.position.x = cameraBaseX + Math.sin(t * 0.15) * 0.15;
+      for (const m of markers) {
+        const pulse = 1 + Math.sin(t * 2 + m.userData.phase) * 0.15;
+        m.scale.setScalar(pulse);
+      }
+      const sweepAngle = sweep.rotation.z;
+      if (Math.abs(sweepAngle - lastSweepAngle) > 0.4) {
+        lastSweepAngle = sweepAngle;
+        const blip = blips[Math.floor(Math.random() * blips.length)];
+        blip.position.set((Math.random() - 0.5) * 4.5, (Math.random() - 0.5) * 4.5, 0.01);
+        blip.userData.life = 1;
+      }
+      for (const blip of blips) {
+        if (blip.userData.life > 0) {
+          blip.userData.life -= 0.02;
+          blip.material.opacity = blip.userData.life * 0.55;
+        }
+      }
+    } else {
+      globe.rotation.y = t * 0.05;
+    }
     renderer.render(scene, camera);
     raf = requestAnimationFrame(frame);
   }
   frame();
 
-  // save cycles when the tab is hidden
   document.addEventListener("visibilitychange", () => {
     if (document.hidden) cancelAnimationFrame(raf);
     else frame();

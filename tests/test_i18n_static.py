@@ -48,16 +48,20 @@ class BuildStaticUiTests(unittest.TestCase):
     def test_build_includes_card_header_and_i18n(self) -> None:
         from scripts.build_static import build_static, _SW_CACHE
 
-        self.assertEqual(_SW_CACHE, "coh-ucs-v10")
+        self.assertEqual(_SW_CACHE, "coh-ucs-v11")
         with tempfile.TemporaryDirectory() as tmp:
             out = Path(tmp) / "dist"
             build_static(out, "https://coh-ucs-tools.fly.dev", "https://benmed00.github.io/coh-ucs-tools")
             css = (out / "css" / "app.css").read_text(encoding="utf-8")
+            motion = (out / "css" / "motion.css").read_text(encoding="utf-8")
             sw = (out / "service-worker.js").read_text(encoding="utf-8")
             self.assertIn(".card-header", css)
-            self.assertIn("coh-ucs-v10", sw)
+            self.assertIn("prefers-reduced-motion", motion)
+            self.assertIn("coh-ucs-v11", sw)
+            self.assertIn("./js/motion.js", sw)
             self.assertIn("./js/i18n.js", sw)
             index = (out / "index.html").read_text(encoding="utf-8")
+            self.assertIn("motion.css", index)
             self.assertIn("/coh-ucs-tools/sitemap.xml", index)
             self.assertIn("renderPaneError", (out / "js" / "core.js").read_text(encoding="utf-8"))
             self.assertIn('rel="icon"', index)

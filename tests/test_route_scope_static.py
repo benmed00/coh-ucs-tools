@@ -19,6 +19,7 @@ class RouteScopeStaticTests(unittest.TestCase):
             "routeAlive",
             "routeSignal",
             "setViewHtml",
+            "setViewAnimate",
             "patchHtml",
             "q",
             "RouteAbortError",

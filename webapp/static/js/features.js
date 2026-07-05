@@ -241,7 +241,8 @@ export async function renderLanguages() {
           options: { maintainAspectRatio: false, scales: { y: { max: 100, beginAtZero: true } }, plugins: { legend: { display: false } } },
         });
       }
-      for (const l of d.languages) {
+      for (let i = 0; i < d.languages.length; i++) {
+        const l = d.languages[i];
         const ctx = document.getElementById(`donut-${l.code}`);
         if (!ctx) continue;
         await makeChart(ctx, {
@@ -251,7 +252,12 @@ export async function renderLanguages() {
             datasets: [{ data: [l.coverage_percent, 100 - l.coverage_percent],
               backgroundColor: [colors.green, colors.dim], borderColor: "transparent" }],
           },
-          options: { maintainAspectRatio: false, plugins: { legend: { display: false } }, cutout: "65%" },
+          options: {
+            maintainAspectRatio: false,
+            plugins: { legend: { display: false } },
+            cutout: "65%",
+            animation: { delay: Math.min(i, 12) * 80 },
+          },
         });
       }
     } catch { /* Chart.js unavailable offline */ }
