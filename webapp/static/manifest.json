@@ -1,0 +1,9 @@
+{
+  "name": "CoH UCS Toolkit",
+  "short_name": "CoH UCS",
+  "description": "Company of Heroes UCS localization toolkit",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0d1117",
+  "theme_color": "#1a3a2a"
+}

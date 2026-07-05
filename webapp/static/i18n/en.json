@@ -1,0 +1,15 @@
+{
+  "nav.dashboard": "Dashboard",
+  "nav.upload": "Upload",
+  "nav.compare": "Compare",
+  "nav.diff": "Diff",
+  "nav.languages": "Languages",
+  "nav.settings": "Settings",
+  "settings.theme": "Theme",
+  "settings.language": "UI Language",
+  "settings.api_key": "API Key",
+  "action.save": "Save",
+  "action.cancel": "Cancel",
+  "msg.loading": "Loading…",
+  "msg.error": "Error"
+}

@@ -1,0 +1,15 @@
+{
+  "nav.dashboard": "Tableau de bord",
+  "nav.upload": "Téléverser",
+  "nav.compare": "Comparer",
+  "nav.diff": "Différences",
+  "nav.languages": "Langues",
+  "nav.settings": "Paramètres",
+  "settings.theme": "Thème",
+  "settings.language": "Langue de l'interface",
+  "settings.api_key": "Clé API",
+  "action.save": "Enregistrer",
+  "action.cancel": "Annuler",
+  "msg.loading": "Chargement…",
+  "msg.error": "Erreur"
+}

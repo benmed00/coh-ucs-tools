@@ -1,0 +1,15 @@
+{
+  "nav.dashboard": "لوحة التحكم",
+  "nav.upload": "رفع",
+  "nav.compare": "مقارنة",
+  "nav.diff": "الفروقات",
+  "nav.languages": "اللغات",
+  "nav.settings": "الإعدادات",
+  "settings.theme": "المظهر",
+  "settings.language": "لغة الواجهة",
+  "settings.api_key": "مفتاح API",
+  "action.save": "حفظ",
+  "action.cancel": "إلغاء",
+  "msg.loading": "جاري التحميل…",
+  "msg.error": "خطأ"
+}

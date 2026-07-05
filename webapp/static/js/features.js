@@ -458,13 +458,68 @@ export async function renderSga() {
   };
 }
 
+/* --------------------------------------------------------------- editor */
+export async function renderEditor(params) {
+  const el = document.getElementById("view");
+  const files = await loadFiles();
+  const fid = params.get("file") || "";
+  el.innerHTML = `
+    <h2 class="section-title">UCS EDITOR</h2>
+    <p class="section-sub">Monaco editor with live lint. Save creates a new upload.</p>
+    <label class="field">File<select id="ed-file"><option value="">—</option>${fileOptions(files, fid)}</select></label>
+    <div id="monaco" style="height:420px;border:1px solid var(--border);margin:12px 0"></div>
+    <button class="btn" id="ed-save">Save as new upload</button>
+    <div id="ed-lint" class="banner" style="margin-top:12px"></div>`;
+  const loadMonaco = () => new Promise((resolve) => {
+    if (window.monaco) return resolve();
+    const s = document.createElement("script");
+    s.src = "https://cdn.jsdelivr.net/npm/monaco-editor@0.52.0/min/vs/loader.js";
+    s.onload = () => {
+      require.config({ paths: { vs: "https://cdn.jsdelivr.net/npm/monaco-editor@0.52.0/min/vs" } });
+      require(["vs/editor/editor.main"], resolve);
+    };
+    document.head.appendChild(s);
+  });
+  let editor;
+  async function loadFile(id) {
+    if (!id) return;
+    const page = await api(`/api/files/${id}/entries?limit=500`);
+    const text = page.entries.map(e => `${e.key}\t${e.value}`).join("\n");
+    await loadMonaco();
+    if (!editor) {
+      editor = monaco.editor.create(document.getElementById("monaco"), {
+        value: text, language: "plaintext", theme: "vs-dark", automaticLayout: true,
+      });
+    } else editor.setValue(text);
+    const lint = await api(`/api/files/${id}/lint`);
+    document.getElementById("ed-lint").textContent =
+      `${lint.entries_with_issues} entries with issues · ${lint.token_issue_count} token issues`;
+  }
+  document.getElementById("ed-file").onchange = e => loadFile(e.target.value);
+  document.getElementById("ed-save").onclick = async () => {
+    const id = document.getElementById("ed-file").value;
+    if (!id || !editor) { toast("Load a file first"); return; }
+    const entries = editor.getValue().split(/\r?\n/).filter(Boolean).map(line => {
+      const t = line.indexOf("\t");
+      return t < 0 ? null : { key: parseInt(line.slice(0, t), 10), value: line.slice(t + 1) };
+    }).filter(Boolean);
+    const r = await api(`/api/files/${id}/save`, { method: "POST", body: JSON.stringify({ entries }) });
+    toast(`Saved as ${r.file_id}`);
+  };
+  if (fid) await loadFile(fid);
+}
+
 /* --------------------------------------------------------------- settings */
 export async function renderSettings() {
   const theme = localStorage.getItem("coh-theme") || "dark";
+  const lang = localStorage.getItem("coh-ui-lang") || "en";
   document.getElementById("view").innerHTML = `
     <h2 class="section-title">SETTINGS</h2>
     <div class="card" style="max-width:480px">
       <label class="toggle"><input type="checkbox" id="theme-t" ${theme==="light"?"checked":""}> Light theme</label>
+      <label class="field" style="margin-top:16px">UI language
+        <select id="ui-lang"><option value="en">English</option><option value="fr">Français</option><option value="ar">العربية</option></select>
+      </label>
       <p style="margin-top:16px"><a href="/docs" target="_blank">OpenAPI docs (/docs)</a> ·
         <a href="/api/export/openapi-client" target="_blank">Client snippets</a></p>
     </div>`;
@@ -472,6 +527,11 @@ export async function renderSettings() {
     const light = e.target.checked;
     document.documentElement.dataset.theme = light ? "light" : "dark";
     localStorage.setItem("coh-theme", light ? "light" : "dark");
+  };
+  document.getElementById("ui-lang").value = lang;
+  document.getElementById("ui-lang").onchange = e => {
+    localStorage.setItem("coh-ui-lang", e.target.value);
+    toast("Language saved — reload to apply nav labels");
   };
 }
 

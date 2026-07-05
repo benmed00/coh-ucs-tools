@@ -8,7 +8,7 @@ import {
   initTheme, renderDiff, renderRanges, renderValidator, renderLanguages,
   renderMergeWizard, renderInstall, renderMtLab, renderGlossary,
   renderTimeline, renderDepots, renderSearch, renderBookmarks,
-  renderPatch, renderSga, renderSettings,
+  renderPatch, renderSga, renderSettings, renderEditor,
 } from "./features.js";
 
 initTheme();
@@ -261,6 +261,7 @@ const routes = {
   patch: renderPatch,
   sga: renderSga,
   settings: renderSettings,
+  editor: renderEditor,
 };
 
 async function route() {
