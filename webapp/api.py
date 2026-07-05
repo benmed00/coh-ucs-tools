@@ -16,6 +16,7 @@ from fastapi import APIRouter, HTTPException, Query, Request, UploadFile
 from fastapi.responses import FileResponse
 
 from merge import merge_and_write
+from game_profiles import classify_document, validate_against_profile
 from ucs_stats import Comparison, compress_ranges
 from validator import validate
 
@@ -26,20 +27,29 @@ from .models import (CompareResponse, CompareSide, EntriesPage, Entry,
                      ValidationResponse, VersionInfo, VersionListResponse)
 from . import services
 from .routes_extended import ext_router
+from .auth_routes import auth_router
 from .store import MAX_UPLOAD_BYTES, FileStore, StoredFile
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api")
 
-from .deps import EXTERNAL_TOOLS, KNOWN_VERSIONS, SGA_PLUGIN_TOOLS, _get_record, _summary, get_store
+from .deps import (
+    EXTERNAL_TOOLS, KNOWN_VERSIONS, SGA_PLUGIN_TOOLS,
+    _get_record, _summary, get_store, raise_profile_strict,
+)
 
 
 # ------------------------------------------------------------------- files
 @router.post("/files", tags=["files"], response_model=UploadResponse, status_code=201,
              responses={400: {"model": ErrorResponse}, 413: {"model": ErrorResponse}},
              summary="Upload and analyze a .ucs file")
-async def upload_file(request: Request, file: UploadFile) -> UploadResponse:
+async def upload_file(
+    request: Request,
+    file: UploadFile,
+    game_profile: str = Query("coh1", pattern="^(coh1|coh2|dow1|dow2)$"),
+    strict_profile: bool = Query(False, description="Reject upload when classification does not match game_profile"),
+) -> UploadResponse:
     """Upload a UCS localization file (multipart). The file is parsed
     immediately: encoding and BOM are auto-detected, duplicates and invalid
     lines are counted, and a summary is returned along with the new file id.
@@ -51,8 +61,26 @@ async def upload_file(request: Request, file: UploadFile) -> UploadResponse:
         raise HTTPException(400, "Uploaded file is empty")
     store = get_store(request)
     rec = store.add_upload(file.filename or "upload.ucs", raw)
+    doc = store.document(rec.id)
+    classification = classify_document(doc)
+    profile_check = validate_against_profile(doc, game_profile)
+    if strict_profile and classification["best_match"] != game_profile:
+        store.delete(rec.id)
+        raise HTTPException(
+            422,
+            detail={
+                "message": f"File does not match profile {game_profile!r}",
+                "best_match": classification["best_match"],
+                "confidence": classification["confidence"],
+            },
+        )
     services.audit_log("upload", rec.name, file_id=rec.id)
-    return UploadResponse(file=_summary(rec), message=f"Parsed {rec.keys} entries")
+    return UploadResponse(
+        file=_summary(rec),
+        message=f"Parsed {rec.keys} entries",
+        game_profile=classification,
+        profile_check=profile_check,
+    )
 
 
 @router.get("/files", tags=["files"], response_model=FileListResponse,
@@ -145,10 +173,15 @@ def compare_files(
     request: Request,
     a: str = Query(description="File id of side A"),
     b: str = Query(description="File id of side B"),
+    game_profile: str = Query("coh1", pattern="^(coh1|coh2|dow1|dow2)$"),
+    strict_profile: bool = Query(False, description="Reject when either file's classification mismatches game_profile"),
 ) -> CompareResponse:
     """Coverage statistics for two files plus the missing-id sets of both
     sides compressed into ranges (e.g. `559200-559650`)."""
     store = get_store(request)
+    _get_record(store, a)
+    _get_record(store, b)
+    raise_profile_strict(store, [a, b], game_profile, strict_profile)
     rec_a, rec_b = _get_record(store, a), _get_record(store, b)
     comp = Comparison(russian=store.document(a), english=store.document(b))
     stats = comp.statistics()
@@ -177,15 +210,22 @@ def compare_files(
 # ------------------------------------------------------------------- merge
 @router.post("/merge", tags=["merge"], response_model=MergeResponse,
              responses={404: {"model": ErrorResponse}}, summary="Merge two files")
-def merge_files(request: Request, req: MergeRequest) -> MergeResponse:
+def merge_files(
+    request: Request,
+    req: MergeRequest,
+    game_profile: str = Query("coh1", pattern="^(coh1|coh2|dow1|dow2)$"),
+    strict_profile: bool = Query(False, description="Reject when either file's classification mismatches game_profile"),
+) -> MergeResponse:
     """Merge `source` ids into `target`. Target text is always preserved
     verbatim; ids that only exist in the source are added either as
     `<MISSING>` placeholders or with the source text copied verbatim
     (`fill_from_source`). **No translation is ever generated.** The result is
     a new file offered for download — originals are never overwritten."""
     store = get_store(request)
-    target_rec = _get_record(store, req.target_id)
+    _get_record(store, req.target_id)
     _get_record(store, req.source_id)
+    raise_profile_strict(store, [req.target_id, req.source_id], game_profile, strict_profile)
+    target_rec = _get_record(store, req.target_id)
     target = store.document(req.target_id)
     source = store.document(req.source_id)
 
@@ -202,6 +242,12 @@ def merge_files(request: Request, req: MergeRequest) -> MergeResponse:
                 req.target_id, req.source_id, rec.id,
                 len(result.entries), len(result.added_placeholders))
     services.audit_log("merge", f"{req.mode} +{len(result.added_placeholders)}", file_id=rec.id)
+    services.fire_webhooks("merge_complete", {
+        "file_id": rec.id,
+        "keys": len(result.entries),
+        "added": len(result.added_placeholders),
+        "mode": req.mode,
+    })
     return MergeResponse(
         download_id=rec.id,
         download_url=f"/api/downloads/{rec.id}",
@@ -267,6 +313,7 @@ def list_tools() -> ToolListResponse:
     return ToolListResponse(tools=tools)
 
 
+router.include_router(auth_router)
 router.include_router(ext_router)
 
 

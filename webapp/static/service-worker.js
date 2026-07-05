@@ -1,12 +1,22 @@
-const CACHE = "coh-ucs-v1";
+const CACHE = "coh-ucs-v4";
 const ASSETS = [
   "/",
+  "/static/css/fonts.css",
   "/static/css/app.css",
+  "/static/js/config.js",
+  "/static/js/router.js",
+  "/static/js/seo.js",
   "/static/js/app.js",
   "/static/js/core.js",
   "/static/js/features.js",
   "/static/js/hero.js",
   "/static/manifest.json",
+  "/static/icons/favicon.svg",
+  "/static/icons/icon-192.png",
+  "/static/icons/apple-touch-icon.png",
+  "/static/icons/og-image.png",
+  "/static/fonts/inter-400-latin.woff2",
+  "/static/fonts/inter-500-latin.woff2",
   "/static/i18n/en.json",
   "/static/i18n/fr.json",
   "/static/i18n/ar.json",

@@ -220,6 +220,17 @@ from `master` via GitHub Actions (see [Hybrid deployment](#hybrid-deployment-pha
 in [`docs/DEPLOY.md`](docs/DEPLOY.md)). First deploy requires enabling Pages in repo
 Settings → Pages → Source: **GitHub Actions**.
 
+**SEO / canonical URLs:** The GitHub Pages UI is the **canonical web frontend**
+(`rel=canonical`, Open Graph, JSON-LD). Fly.io serves the same UI when run as a
+monolith but points search engines at GitHub Pages to avoid duplicate indexing.
+Routes use **path-based URLs** (`/upload`, `/compare`, …) with server fallback to
+`index.html` (and `404.html` on GitHub Pages). API documentation (`/docs`,
+`/redoc`) lives on Fly.io and is listed in the Fly `sitemap.xml` only. Submit
+`https://benmed00.github.io/coh-ucs-tools/sitemap.xml` to Google Search Console
+for the UI; optionally add the Fly sitemap for API docs. Legacy `#/route` hash
+URLs redirect automatically to path URLs. See [`docs/DEPLOY.md`](docs/DEPLOY.md)
+(SEO section) for Search Console setup and verification env vars.
+
 Deploy your own copy: [`docs/DEPLOY.md`](docs/DEPLOY.md).
 
 The `webapp/` package serves the toolkit as a REST API plus a static

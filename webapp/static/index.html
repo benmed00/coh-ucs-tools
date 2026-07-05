@@ -3,42 +3,41 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<!-- SEO:HEAD -->
 <title>CoH UCS Tools — localization command console</title>
-<meta name="description" content="Analyze, compare and merge Company of Heroes .ucs localization files.">
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Allerta+Stencil&family=IBM+Plex+Mono:wght@400;500;600&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<!-- /SEO:HEAD -->
+
+<link rel="stylesheet" href="/static/css/fonts.css">
 <link rel="stylesheet" href="/static/css/app.css">
-<link rel="manifest" href="/static/manifest.json">
-<meta name="theme-color" content="#1a3a2a">
 </head>
 <body>
+<a class="skip-link" href="#view">Skip to main content</a>
 <div class="scanlines" aria-hidden="true"></div>
 
 <header class="topbar">
-  <a class="brand" href="#/dashboard">
-    <span class="brand-mark">&#9737;</span>
+  <a class="brand" href="/" data-route="dashboard" aria-label="CoH UCS Tools home">
+    <img class="brand-icon" src="/static/icons/favicon.svg" width="28" height="28" alt="" aria-hidden="true">
     <span class="brand-name">CoH&nbsp;UCS&nbsp;TOOLS</span>
     <span class="brand-sub">LOCALE&nbsp;COMMAND&nbsp;CONSOLE</span>
   </a>
-  <nav class="nav" id="nav">
-    <a href="#/dashboard" data-route="dashboard">Dashboard</a>
-    <a href="#/upload" data-route="upload">Upload</a>
-    <a href="#/compare" data-route="compare">Compare</a>
-    <a href="#/diff" data-route="diff">Diff</a>
-    <a href="#/languages" data-route="languages">Languages</a>
-    <a href="#/search" data-route="search">Search</a>
-    <a href="#/merge-wizard" data-route="merge-wizard">Merge</a>
-    <a href="#/validator" data-route="validator">Validator</a>
-    <a href="#/verify" data-route="verify">Verify</a>
-    <a href="#/translation" data-route="translation">PO/TMX</a>
-    <a href="#/tools" data-route="tools">Tools</a>
-    <a href="#/settings" data-route="settings">Settings</a>
-    <a href="/docs" target="_blank" rel="noopener" class="nav-api">API &#8599;</a>
+  <nav class="nav" id="nav" aria-label="Main navigation">
+    <a href="/" data-route="dashboard">Dashboard</a>
+    <a href="/upload" data-route="upload">Upload</a>
+    <a href="/compare" data-route="compare">Compare</a>
+    <a href="/diff" data-route="diff">Diff</a>
+    <a href="/languages" data-route="languages">Languages</a>
+    <a href="/search" data-route="search">Search</a>
+    <a href="/merge-wizard" data-route="merge-wizard">Merge</a>
+    <a href="/validator" data-route="validator">Validator</a>
+    <a href="/verify" data-route="verify">Verify</a>
+    <a href="/translation" data-route="translation">PO/TMX</a>
+    <a href="/tools" data-route="tools">Tools</a>
+    <a href="/settings" data-route="settings">Settings</a>
+    <a href="/docs" target="_blank" rel="noopener noreferrer" class="nav-api">API &#8599;</a>
   </nav>
 </header>
 
-<section class="hero" id="hero">
+<section class="hero" id="hero" aria-label="Introduction">
   <canvas id="hero-canvas" aria-hidden="true"></canvas>
   <div class="hero-fallback" id="hero-fallback" hidden aria-hidden="true">
     <div class="radar-css"><div class="radar-sweep"></div></div>
@@ -56,18 +55,24 @@
   </div>
 </section>
 
-<main id="view" class="view"><div class="loading">Booting console&hellip;</div></main>
+<main id="view" class="view">
+<!-- SEO:NOSCRIPT -->
+<!-- /SEO:NOSCRIPT -->
+<div class="loading">Booting console&hellip;</div>
+</main>
 
 <footer class="footer">
   <span>coh-ucs-tools &middot; FastAPI + vanilla JS &middot; no build step</span>
-  <span><a href="/docs" target="_blank" rel="noopener">Swagger</a> &middot;
-        <a href="/redoc" target="_blank" rel="noopener">ReDoc</a> &middot;
-        <a href="/openapi.json" target="_blank" rel="noopener">openapi.json</a></span>
+  <span><a href="https://github.com/benmed00/coh-ucs-tools" target="_blank" rel="noopener noreferrer">GitHub</a> &middot;
+        <a href="/about" data-route="about">About</a> &middot;
+        <a href="/docs" target="_blank" rel="noopener noreferrer">Swagger</a> &middot;
+        <a href="/redoc" target="_blank" rel="noopener noreferrer">ReDoc</a> &middot;
+        <a href="/openapi.json" target="_blank" rel="noopener noreferrer">openapi.json</a> &middot;
+        <a href="/sitemap.xml">Sitemap</a></span>
 </footer>
 
-<div id="toast" class="toast" hidden></div>
+<div id="toast" class="toast" hidden role="status" aria-live="polite"></div>
 
-<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.js"></script>
 <script src="/static/js/config.js"></script>
 <script>
 (function () {
@@ -82,7 +87,7 @@
 <script type="module" src="/static/js/app.js"></script>
 <script>
 if ("serviceWorker" in navigator) {
-  navigator.serviceWorker.register("/static/service-worker.js").catch(() => {});
+  navigator.serviceWorker.register("/static/service-worker.js").catch(function () {});
 }
 </script>
 </body>

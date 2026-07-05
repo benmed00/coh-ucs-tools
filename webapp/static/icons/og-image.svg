@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 630" role="img" aria-label="CoH UCS Tools  localization command console">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#12140e"/>
+      <stop offset="100%" stop-color="#1a1d13"/>
+    </linearGradient>
+  </defs>
+  <rect width="1200" height="630" fill="url(#bg)"/>
+  <rect x="48" y="48" width="1104" height="534" rx="12" fill="none" stroke="#3a4028" stroke-width="2"/>
+  <circle cx="180" cy="315" r="56" fill="#ffb648"/>
+  <g stroke="#ffb648" stroke-width="8" stroke-linecap="round">
+    <line x1="180" y1="220" x2="180" y2="250"/>
+    <line x1="180" y1="380" x2="180" y2="410"/>
+    <line x1="85" y1="315" x2="115" y2="315"/>
+    <line x1="245" y1="315" x2="275" y2="315"/>
+    <line x1="113" y1="248" x2="133" y2="268"/>
+    <line x1="227" y1="362" x2="247" y2="382"/>
+    <line x1="247" y1="248" x2="227" y2="268"/>
+    <line x1="133" y1="362" x2="113" y2="382"/>
+  </g>
+  <text x="280" y="260" font-family="Arial Black, sans-serif" font-size="64" fill="#cdc294" letter-spacing="4">COH UCS TOOLS</text>
+  <text x="280" y="330" font-family="Consolas, monospace" font-size="28" fill="#8f8c77" letter-spacing="3">LOCALIZATION COMMAND CONSOLE</text>
+  <text x="280" y="400" font-family="Consolas, monospace" font-size="24" fill="#9acd68">Analyze · Compare · Merge · Validate .ucs files</text>
+  <text x="280" y="450" font-family="Consolas, monospace" font-size="20" fill="#8a9a5b">UTF-16-LE · FF FE BOM · CRLF · id’text</text>
+</svg>

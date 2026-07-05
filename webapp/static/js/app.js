@@ -1,8 +1,12 @@
-/* CoH UCS Tools — SPA (hash routing, no build step). */
+/* CoH UCS Tools — SPA (path routing, no build step). */
+
+import { applyRouteSeo } from "./seo.js";
+import { initNavLinks, navigateRoute, parseRoute, routePath } from "./router.js";
 
 import {
   view, toast, api, apiUrl, esc, fmt, loadFiles, fileOptions, UCS_FACTS,
   destroyCharts, makeChart, CHART_COLORS, exportChartPng,
+  profileQueryString, profileBarHtml, bindProfileBar,
 } from "./core.js";
 import {
   initTheme, renderDiff, renderRanges, renderValidator, renderLanguages,
@@ -10,10 +14,11 @@ import {
   renderTimeline, renderDepots, renderSearch, renderBookmarks,
   renderPatch, renderSga, renderSettings, renderEditor,
   renderVerify, renderTranslation,
-  renderCampaigns, renderGames,
+  renderCampaigns, renderGames, renderAbout,
 } from "./features.js";
 
 initTheme();
+initNavLinks();
 
 /* ------------------------------------------------------------ dashboard */
 async function renderDashboard() {
@@ -32,26 +37,28 @@ async function renderDashboard() {
     <div class="grid cols-2">
       ${versions.map(v => `
         <div class="card">
-          <span class="kind-tag">${v.available ? "on disk" : "not found"}</span>
-          <h3>${esc(v.name)}</h3>
+          <div class="card-header">
+            <h3>${esc(v.name)}</h3>
+            <span class="kind-tag">${v.available ? "on disk" : "not found"}</span>
+          </div>
           <div class="keybar"><i style="width:${v.available ? (100 * v.keys / maxKeys).toFixed(1) : 0}%"></i></div>
           <div class="keybar-label">${v.available ? fmt(v.keys) + " keys" : "file not present"}</div>
           <div class="stat-row"><span class="k">origin</span><span class="v">${esc(v.origin)}</span></div>
           <div class="stat-row"><span class="k">completeness</span><span class="v">${esc(v.completeness)}</span></div>
           ${v.available ? `<a class="btn ghost small" href="${v.download_url}">Download</a>
-            <a class="btn ghost small" href="#/upload?file=${v.id}">Analyze</a>` : ""}
+            <a class="btn ghost small" href="${routePath("upload", { file: v.id })}">Analyze</a>` : ""}
         </div>`).join("")}
     </div>
     <h2 class="section-title" style="margin-top:38px">STORED FILES</h2>
     <p class="section-sub">${uploads.length} upload(s), ${generated.length} generated.</p>
     ${files.length === 0 ? `<div class="empty"><span class="empty-icon">&#128194;</span>
-        Nothing here — <a href="#/upload">Upload</a>.</div>` : `
+        Nothing here — <a href="${routePath("upload")}">Upload</a>.</div>` : `
       <div class="table-wrap"><table class="data">
         <thead><tr><th>kind</th><th>name</th><th>keys</th><th>dups</th><th>invalid</th><th></th></tr></thead>
         <tbody>${files.map(f => `
           <tr><td>${f.kind}</td><td class="val">${esc(f.name)}</td><td class="num">${fmt(f.keys)}</td>
             <td>${f.duplicates}</td><td>${f.invalid_lines}</td>
-            <td><a href="#/upload?file=${f.id}">analyze</a> · <a href="${apiUrl(`/api/downloads/${f.id}`)}">dl</a>
+            <td><a href="${routePath("upload", { file: f.id })}">analyze</a> · <a href="${apiUrl(`/api/downloads/${f.id}`)}">dl</a>
             ${f.kind !== "version" ? ` · <a href="#" data-del="${f.id}" style="color:var(--red)">del</a>` : ""}</td></tr>`).join("")}
         </tbody></table></div>`}
   `;
@@ -68,6 +75,8 @@ async function renderUpload(params) {
   view.innerHTML = `<div class="loading">Preparing</div>`;
   const files = await loadFiles();
   const selected = params.get("file") || "";
+  const savedProfile = sessionStorage.getItem("coh-last-profile") || "coh1";
+  const savedStrict = sessionStorage.getItem("coh-strict-profile") === "true";
   view.innerHTML = `
     <h2 class="section-title">UPLOAD &amp; ANALYZE</h2>
     <div class="grid cols-2">
@@ -77,16 +86,39 @@ async function renderUpload(params) {
           ${UCS_FACTS.map(([k,v]) => `<div class="stat-row"><span class="k">${k}</span><span class="v">${esc(v)}</span></div>`).join("")}
         </div></div>
       <div><label class="field">Stored file<select id="file-select"><option value="">—</option>${fileOptions(files, selected)}</select></label>
+        <label class="field" style="margin-top:12px">Expected game profile
+          <select id="game-profile">
+            <option value="coh1" ${savedProfile === "coh1" ? "selected" : ""}>CoH 1</option>
+            <option value="coh2" ${savedProfile === "coh2" ? "selected" : ""}>CoH 2</option>
+            <option value="dow1" ${savedProfile === "dow1" ? "selected" : ""}>Dawn of War</option>
+            <option value="dow2" ${savedProfile === "dow2" ? "selected" : ""}>DoW II</option>
+          </select>
+        </label>
+        <label class="toggle" style="margin-top:8px"><input type="checkbox" id="strict-profile" ${savedStrict ? "checked" : ""}> Reject mismatch</label>
         <div id="analysis"></div></div>
     </div>
     <div id="entries-panel" style="margin-top:30px"></div>`;
+  document.getElementById("game-profile").onchange = e => {
+    sessionStorage.setItem("coh-last-profile", e.target.value);
+  };
+  document.getElementById("strict-profile").onchange = e => {
+    sessionStorage.setItem("coh-strict-profile", e.target.checked ? "true" : "false");
+  };
   const dz = document.getElementById("dropzone"), input = document.getElementById("file-input");
   async function upload(file) {
     if (!file) return;
     const fd = new FormData(); fd.append("file", file);
-    const res = await api("/api/files", { method: "POST", body: fd });
+    const profile = document.getElementById("game-profile")?.value || "coh1";
+    const strict = document.getElementById("strict-profile")?.checked ? "true" : "false";
+    const res = await api(`/api/files?game_profile=${profile}&strict_profile=${strict}`, { method: "POST", body: fd });
     toast(res.message);
-    location.hash = `#/upload?file=${res.file.id}`;
+    if (res.game_profile) {
+      const gp = res.game_profile;
+      sessionStorage.setItem("coh-last-profile", profile);
+      sessionStorage.setItem("coh-strict-profile", strict);
+      toast(`Classified as ${gp.best_match} (${Math.round(gp.confidence * 100)}%)`, 4000);
+    }
+    navigateRoute("upload", { file: res.file.id });
   }
   dz.onclick = () => input.click();
   input.onchange = () => upload(input.files[0]);
@@ -95,7 +127,7 @@ async function renderUpload(params) {
     if (ev === "drop") upload(e.dataTransfer.files[0]);
   }));
   document.getElementById("file-select").onchange = e => {
-    location.hash = e.target.value ? `#/upload?file=${e.target.value}` : "#/upload";
+    navigateRoute("upload", e.target.value ? { file: e.target.value } : undefined);
   };
   if (selected) await renderAnalysis(selected);
 }
@@ -103,15 +135,30 @@ async function renderUpload(params) {
 async function renderAnalysis(fileId) {
   const analysis = document.getElementById("analysis");
   analysis.innerHTML = `<div class="loading">Parsing</div>`;
-  const [f, val] = await Promise.all([
-    api(`/api/files/${fileId}`), api(`/api/files/${fileId}/validate`),
+  const [f, val, gp] = await Promise.all([
+    api(`/api/files/${fileId}`),
+    api(`/api/files/${fileId}/validate`),
+    api(`/api/files/${fileId}/game-profile`).catch(() => null),
   ]);
+  const expected = sessionStorage.getItem("coh-last-profile") || "coh1";
+  let profileBlock = "";
+  if (gp) {
+    const mismatch = gp.best_match !== expected;
+    profileBlock = `
+      <div class="banner" style="margin-top:10px;font-size:13px">
+        <strong>Game profile:</strong> ${esc(gp.best_match)} (${Math.round(gp.confidence * 100)}% confidence)
+        ${mismatch ? `<span class="bad"> — expected ${esc(expected)}</span>` : `<span class="good"> — matches selection</span>`}
+        ${gp.warnings?.length ? `<ul style="margin:8px 0 0;padding-left:18px">${gp.warnings.map(w => `<li>${esc(w)}</li>`).join("")}</ul>` : ""}
+      </div>`;
+  }
   analysis.innerHTML = `
     <div class="card"><h3>${esc(f.name)}</h3>
       <div class="stat-row"><span class="k">keys</span><span class="v good">${fmt(f.keys)}</span></div>
       <div class="stat-row"><span class="k">validation</span><span class="v ${val.ok?'good':'bad'}">${val.ok?'OK':'FAIL'}</span></div>
-      <a class="btn ghost small" href="#/validator?file=${f.id}">Validator</a>
-      <a class="btn ghost small" href="#/compare?a=${f.id}">Compare</a>
+      ${profileBlock}
+      <a class="btn ghost small" href="${routePath("validator", { file: f.id })}">Validator</a>
+      <a class="btn ghost small" href="${routePath("compare", { a: f.id })}">Compare</a>
+      <a class="btn ghost small" href="${routePath("games", { file: f.id })}">Game profiles</a>
     </div>`;
   renderEntriesBrowser(fileId);
 }
@@ -151,16 +198,18 @@ async function renderCompare(params) {
   const a = params.get("a") || "", b = params.get("b") || "";
   view.innerHTML = `
     <h2 class="section-title">COMPARE</h2>
+    ${profileBarHtml()}
     <div class="form-row">
       <label class="field">A<select id="sel-a"><option value="">—</option>${fileOptions(files,a)}</select></label>
       <label class="field">B<select id="sel-b"><option value="">—</option>${fileOptions(files,b)}</select></label>
       <button class="btn" id="go">Compare</button>
-      <a class="btn ghost" href="#/diff?a=${a}&b=${b}">Diff view</a>
-      <a class="btn ghost" href="#/ranges?a=${a}&b=${b}">Ranges</a>
+      <a class="btn ghost" href="${routePath("diff", { a, b })}">Diff view</a>
+      <a class="btn ghost" href="${routePath("ranges", { a, b })}">Ranges</a>
     </div><div id="compare-out"></div>`;
+  bindProfileBar(view);
   document.getElementById("go").onclick = () => {
     const va = document.getElementById("sel-a").value, vb = document.getElementById("sel-b").value;
-    if (va && vb) location.hash = `#/compare?a=${va}&b=${vb}`;
+    if (va && vb) navigateRoute("compare", { a: va, b: vb });
   };
   if (a && b) await runCompare(a, b);
 }
@@ -168,9 +217,15 @@ async function renderCompare(params) {
 async function runCompare(a, b) {
   const out = document.getElementById("compare-out");
   out.innerHTML = `<div class="loading">Crunching</div>`;
-  const d = await api(`/api/compare?a=${a}&b=${b}`);
+  let d;
+  try {
+    d = await api(`/api/compare?a=${a}&b=${b}&${profileQueryString()}`);
+  } catch (err) {
+    out.innerHTML = `<div class="banner error">${esc(err.message)}</div>`;
+    return;
+  }
   const side = (s, label) => `
-    <div class="card"><span class="kind-tag">side ${label}</span><h3>${esc(s.name)}</h3>
+    <div class="card"><div class="card-header"><h3>${esc(s.name)}</h3><span class="kind-tag">side ${label}</span></div>
       <div class="keybar"><i style="width:${s.coverage_percent}%"></i></div>
       <div class="keybar-label">${s.coverage_percent}% coverage · ${fmt(s.missing_keys)} missing</div>
       ${s.missing_ranges.length ? `<details><summary>${s.missing_ranges.length} range(s)</summary>
@@ -186,20 +241,20 @@ async function runCompare(a, b) {
     </div>`;
   window.exportChartPng = exportChartPng;
   destroyCharts();
-  if (window.Chart) {
-    makeChart(document.getElementById("ch-keys"), {
+  try {
+    await makeChart(document.getElementById("ch-keys"), {
       type: "bar", data: { labels: ["A","B"], datasets: [
         { label: "present", data: [d.a.total_keys, d.b.total_keys], backgroundColor: CHART_COLORS.olive },
         { label: "missing", data: [d.a.missing_keys, d.b.missing_keys], backgroundColor: CHART_COLORS.red },
       ]}, options: { maintainAspectRatio: false, responsive: true, scales: { x: { stacked: true }, y: { stacked: true } } },
     });
-    makeChart(document.getElementById("ch-overlap"), {
+    await makeChart(document.getElementById("ch-overlap"), {
       type: "doughnut", data: { labels: ["common","only A","only B"],
         datasets: [{ data: [d.common_keys, d.b.missing_keys, d.a.missing_keys],
           backgroundColor: [CHART_COLORS.green, CHART_COLORS.amber, CHART_COLORS.red] }] },
       options: { maintainAspectRatio: false, responsive: true, cutout: "60%" },
     });
-  }
+  } catch { /* Chart.js unavailable offline */ }
 }
 
 /* ---------------------------------------------------------------- merge */
@@ -208,7 +263,8 @@ async function renderMerge(params) {
   const files = await loadFiles();
   view.innerHTML = `
     <h2 class="section-title">MERGE</h2>
-    <p class="section-sub">Quick merge — or use the <a href="#/merge-wizard">wizard</a> for preview.</p>
+    <p class="section-sub">Quick merge — or use the <a href="${routePath("merge-wizard")}">wizard</a> for preview.</p>
+    ${profileBarHtml()}
     <div class="card" style="max-width:760px">
       <div class="form-row">
         <label class="field">Target<select id="m-target">${fileOptions(files, params.get("target")||"")}</select></label>
@@ -220,12 +276,15 @@ async function renderMerge(params) {
       </div>
       <button class="btn" id="m-go">Merge</button><div id="merge-out"></div>
     </div>`;
+  bindProfileBar(view);
   document.getElementById("m-go").onclick = async () => {
-    const r = await api("/api/merge", { method:"POST", headers:{"Content-Type":"application/json"},
+    try {
+    const r = await api(`/api/merge?${profileQueryString()}`, { method:"POST", headers:{"Content-Type":"application/json"},
       body: JSON.stringify({ target_id: document.getElementById("m-target").value,
         source_id: document.getElementById("m-source").value,
         mode: document.querySelector('input[name="mode"]:checked').value }) });
     document.getElementById("merge-out").innerHTML = `<div class="banner"><a href="${r.download_url}">Download ${esc(r.filename)}</a></div>`;
+    } catch (err) { toast(err.message); }
   };
 }
 
@@ -238,12 +297,13 @@ async function renderTools() {
       <div class="card tool-card"><span class="cat">${esc(t.category)}</span>
         <h3><a href="${esc(t.url)}" target="_blank">${esc(t.name)}</a></h3><p>${esc(t.description)}</p></div>`).join("")}
     </div>
-    <p style="margin-top:20px"><a href="#/depots">Depots &amp; sources</a> · <a href="${apiUrl("/docs")}" target="_blank">API docs</a></p>`;
+    <p style="margin-top:20px"><a href="${routePath("depots")}">Depots &amp; sources</a> · <a href="${apiUrl("/docs")}" target="_blank">API docs</a></p>`;
 }
 
 /* --------------------------------------------------------------- router */
 const routes = {
   dashboard: renderDashboard,
+  about: renderAbout,
   upload: renderUpload,
   compare: renderCompare,
   merge: renderMerge,
@@ -272,18 +332,18 @@ const routes = {
 
 async function route() {
   destroyCharts();
-  const hash = location.hash.slice(2) || "dashboard";
-  const [name, query] = hash.split("?");
-  const params = new URLSearchParams(query || "");
+  const { name, params } = parseRoute();
   const handler = routes[name] || renderDashboard;
+  const routeKey = routes[name] ? name : "dashboard";
+  applyRouteSeo(routeKey);
   document.querySelectorAll("#nav a[data-route]").forEach(a =>
-    a.classList.toggle("active", a.dataset.route === (routes[name] ? name : "dashboard")));
+    a.classList.toggle("active", a.dataset.route === routeKey));
   try { await handler(params); }
   catch (err) { view.innerHTML = `<div class="banner error">${esc(err.message)}</div>`; }
 }
 
-window.addEventListener("hashchange", route);
+window.addEventListener("popstate", route);
+window.addEventListener("coh-route", route);
 route();
 
-/* hero locale click → languages hub */
-window.addEventListener("coh-locale-click", () => { location.hash = "#/languages"; });
+window.addEventListener("coh-locale-click", () => { navigateRoute("languages"); });
