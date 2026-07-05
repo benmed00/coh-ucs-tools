@@ -7,8 +7,12 @@
 <title>CoH UCS Tools — localization command console</title>
 <!-- /SEO:HEAD -->
 
+<link rel="preload" href="/static/fonts/inter-400-latin.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="/static/fonts/allerta-stencil-400-latin.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="stylesheet" href="/static/css/fonts.css">
 <link rel="stylesheet" href="/static/css/app.css">
+<link rel="icon" href="/static/icons/favicon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="/static/icons/apple-touch-icon.png">
 </head>
 <body>
 <a class="skip-link" href="#view" data-i18n="skip.main">Skip to main content</a>
@@ -47,13 +51,13 @@
   </div>
   <div class="hero-copy">
     <h1 data-i18n-html="hero.title">UCS LOCALIZATION<br>COMMAND CONSOLE</h1>
-    <p class="hero-tag">Analyze &middot; compare &middot; merge Company&nbsp;of&nbsp;Heroes <code>.ucs</code> files.
+    <p class="hero-tag" data-i18n-html="hero.tag_html">Analyze &middot; compare &middot; merge Company&nbsp;of&nbsp;Heroes <code>.ucs</code> files.
        UTF-16-LE, <code>FF&nbsp;FE</code> BOM, CRLF, <code>id&#8677;text</code> — we speak it fluently.</p>
     <div class="hero-badges">
-      <button type="button" class="badge" data-tip="Every UCS file starts with the 2-byte little-endian byte-order mark FF FE.">BOM FF FE</button>
-      <button type="button" class="badge" data-tip="Values are everything after the FIRST tab — they may legally contain more tabs.">TAB separated</button>
-      <button type="button" class="badge" data-tip="When the engine can't resolve an id it renders '$id No Key' in-game.">$id No Key</button>
-      <button type="button" class="badge" data-tip="The format has no comment syntax. Anything that isn't id&#8677;text is invalid.">no comments</button>
+      <button type="button" class="badge" data-i18n="hero.badge.bom" data-i18n-attr="hero.badge.bom_tip:aria-label" data-tip="Every UCS file starts with the 2-byte little-endian byte-order mark FF FE.">BOM FF FE</button>
+      <button type="button" class="badge" data-i18n="hero.badge.tab" data-i18n-attr="hero.badge.tab_tip:aria-label" data-tip="Values are everything after the FIRST tab — they may legally contain more tabs.">TAB separated</button>
+      <button type="button" class="badge" data-i18n="hero.badge.nkey" data-i18n-attr="hero.badge.nkey_tip:aria-label" data-tip="When the engine can't resolve an id it renders '$id No Key' in-game.">$id No Key</button>
+      <button type="button" class="badge" data-i18n="hero.badge.comments" data-i18n-attr="hero.badge.comments_tip:aria-label" data-tip="The format has no comment syntax. Anything that isn't id&#8677;text is invalid.">no comments</button>
     </div>
   </div>
 </section>
@@ -65,15 +69,15 @@
 </main>
 
 <footer class="footer">
-  <span>coh-ucs-tools &middot; FastAPI + vanilla JS &middot; no build step</span>
+  <span data-i18n="footer.stack">coh-ucs-tools &middot; FastAPI + vanilla JS &middot; no build step</span>
   <span><a href="https://github.com/benmed00/coh-ucs-tools" target="_blank" rel="noopener noreferrer">GitHub</a> &middot;
-        <a href="https://benmed00.github.io/coh-ucs-tools/" target="_blank" rel="noopener noreferrer">Live UI</a> &middot;
-        <a href="https://coh-ucs-tools.fly.dev" target="_blank" rel="noopener noreferrer">API</a> &middot;
-        <a href="/about" data-route="about">About</a> &middot;
+        <a href="https://benmed00.github.io/coh-ucs-tools/" target="_blank" rel="noopener noreferrer" data-i18n="footer.live_ui">Live UI</a> &middot;
+        <a href="https://coh-ucs-tools.fly.dev" target="_blank" rel="noopener noreferrer" data-i18n="footer.api">API</a> &middot;
+        <a href="/about" data-route="about" data-i18n="footer.about">About</a> &middot;
         <a href="/docs" target="_blank" rel="noopener noreferrer">Swagger</a> &middot;
         <a href="/redoc" target="_blank" rel="noopener noreferrer">ReDoc</a> &middot;
         <a href="/openapi.json" target="_blank" rel="noopener noreferrer">openapi.json</a> &middot;
-        <a href="/sitemap.xml">Sitemap</a></span>
+        <a href="/sitemap.xml" data-i18n="footer.sitemap">Sitemap</a></span>
 </footer>
 
 <div id="toast" class="toast" hidden role="status" aria-live="polite"></div>

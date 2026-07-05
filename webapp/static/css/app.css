@@ -16,7 +16,7 @@
   --text: #d8d4c0;
   --text-dim: #8f8c77;
   --mono: "IBM Plex Mono", Consolas, monospace;
-  --stencil: "Allerta Stencil", "Arial Black", sans-serif;
+  --stencil: "Allerta Stencil", "Allerta Stencil Fallback", "Arial Black", sans-serif;
   --sans: Inter, "Segoe UI", sans-serif;
 }
 
@@ -63,7 +63,7 @@ code { font-family: var(--mono); color: var(--khaki); background: #ffffff0d; pad
 }
 .brand { display: flex; align-items: center; gap: 10px; color: var(--khaki); }
 .brand:hover { text-decoration: none; }
-.brand-icon { flex-shrink: 0; border-radius: 4px; }
+.brand-icon { flex-shrink: 0; border-radius: 4px; width: 28px; height: 28px; }
 .brand-mark { font-size: 22px; color: var(--amber); }
 .brand-name { font-family: var(--stencil); font-size: 19px; letter-spacing: 2px; color: var(--khaki); }
 .brand-sub { font-family: var(--mono); font-size: 10px; letter-spacing: 3px; color: var(--text-dim); }
@@ -139,6 +139,8 @@ code { font-family: var(--mono); color: var(--khaki); background: #ffffff0d; pad
 .hero-copy h1 {
   font-family: var(--stencil); font-size: clamp(26px, 4.6vw, 46px);
   letter-spacing: 4px; line-height: 1.15; margin: 0 0 12px;
+  /* Reserve two lines so stencil font swap does not shift layout */
+  min-height: calc(2 * 1.15 * clamp(26px, 4.6vw, 46px));
   color: var(--khaki);
   text-shadow: 0 0 24px #ffb64830, 3px 3px 0 #00000070;
 }
@@ -193,6 +195,14 @@ button.badge {
 
 /* ---------------------------------------------------------------- view */
 .view { max-width: 1180px; margin: 0 auto; padding: 34px 28px 80px; min-height: 45vh; }
+/* Reserve space while SPA bootstraps — avoids large CLS when API content replaces loader */
+#view > .loading {
+  min-height: 480px;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding-top: 72px;
+}
 
 h2.section-title {
   font-family: var(--stencil); letter-spacing: 3px; color: var(--khaki);
@@ -325,6 +335,7 @@ td .sev-warning { color: var(--amber); }
 }
 .empty .empty-icon { font-size: 38px; display: block; margin-bottom: 10px; color: var(--olive); }
 .loading { text-align: center; padding: 60px; color: var(--text-dim); font-family: var(--mono); }
+#view > .loading { padding: 0; }
 .loading::after { content: "_"; animation: blink 1s steps(1) infinite; color: var(--amber); }
 @keyframes blink { 50% { opacity: 0; } }
 
@@ -419,6 +430,35 @@ html[data-theme="light"] textarea {
   background: #faf8f2;
 }
 html[data-theme="light"] table.data th { background: #ece8dc; }
+html[data-theme="light"] .topbar { background: #f4f0e4ee; }
+html[data-theme="light"] .toast {
+  background: var(--panel-solid); color: var(--text); border-color: var(--amber-dim);
+  box-shadow: 0 10px 30px #00000018;
+}
+html[data-theme="light"] .banner { background: #9acd6820; }
+html[data-theme="light"] .banner.error { background: #e06c4f18; }
+html[data-theme="light"] .nav a.active { background: #ffb64820; }
+
+.mt-sm { margin-top: 12px; }
+.mt-md { margin-top: 20px; }
+.mt-lg { margin-top: 30px; }
+.mb-sm { margin-bottom: 12px; }
+.mb-md { margin-bottom: 16px; }
+.chart-h-sm { height: 140px; }
+.chart-h-md { height: 220px; }
+.text-dim-sm { font-size: 13px; color: var(--text-dim); }
+.good-text { color: var(--green); }
+.ml-sm { margin-left: 8px; }
+.section-heading-sm { font-size: 16px; }
+.card-heading-sm { font-size: 14px; margin: 0 0 8px; }
+.good-text { color: var(--green); }
+.depot-out { font-size: 12px; margin-top: 8px; }
+.copy-btn-inline { margin-left: 10px; }
+.settings-form { margin: 0; }
+.field-flex-2 { flex: 2; }
+.text-ellipsis { max-width: 200px; overflow: hidden; text-overflow: ellipsis; }
+.link-danger { color: var(--red); }
+.list-indented { margin-left: 18px; padding-left: 18px; }
 
 /* extended UI */
 mark.token { background: #ffb64840; color: var(--amber); padding: 0 2px; border-radius: 2px; }

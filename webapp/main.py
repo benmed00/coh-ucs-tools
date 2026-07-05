@@ -31,6 +31,7 @@ from .seo import (
     is_spa_path,
     robots_txt,
     sitemap_xml,
+    spa_route_slug,
     ui_site_url,
 )
 from .store import FileStore
@@ -206,9 +207,14 @@ async def seo_response_headers(request: Request, call_next):
     return response
 
 
-def _render_index_html() -> str:
+def _render_index_html(spa_path: str = "") -> str:
     raw = (STATIC_DIR / "index.html").read_text(encoding="utf-8")
-    return inject_index_html(raw, base_url=ui_site_url(), base_path="")
+    return inject_index_html(
+        raw,
+        base_url=ui_site_url(),
+        base_path="",
+        route_slug=spa_route_slug(spa_path),
+    )
 
 
 @app.get("/", include_in_schema=False)
@@ -267,5 +273,5 @@ app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 def spa_fallback(spa_path: str) -> HTMLResponse:
     """Serve SPA shell for path-based client routes (e.g. ``/upload``)."""
     if is_spa_path(spa_path):
-        return HTMLResponse(_render_index_html())
+        return HTMLResponse(_render_index_html(spa_path))
     raise HTTPException(status_code=404)

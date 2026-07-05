@@ -15,9 +15,26 @@ async function loadLocale(code) {
   return res.json();
 }
 
-export function t(key, fallback) {
-  if (Object.prototype.hasOwnProperty.call(strings, key)) return strings[key];
-  return fallback !== undefined ? fallback : key;
+export function t(key, vars) {
+  let val;
+  if (Object.prototype.hasOwnProperty.call(strings, key)) {
+    val = strings[key];
+  } else if (vars !== undefined && typeof vars !== "object") {
+    return vars;
+  } else {
+    return key;
+  }
+  if (vars && typeof vars === "object") {
+    return val.replace(/\{(\w+)\}/g, (_, k) =>
+      Object.prototype.hasOwnProperty.call(vars, k) ? String(vars[k]) : `{${k}}`);
+  }
+  return val;
+}
+
+const LOCALE_TAGS = { en: "en-US", fr: "fr-FR", ar: "ar" };
+
+export function getLocaleTag() {
+  return LOCALE_TAGS[locale] || "en-US";
 }
 
 export function getLocale() {
@@ -33,6 +50,11 @@ export function applyShellI18n() {
   document.querySelectorAll("[data-i18n-html]").forEach(el => {
     const key = el.dataset.i18nHtml;
     el.innerHTML = t(key).replace(/\n/g, "<br>");
+  });
+  document.querySelectorAll("[data-i18n-attr]").forEach(el => {
+    const [key, attr] = el.dataset.i18nAttr.split(":");
+    const val = t(key);
+    if (val !== key) el.setAttribute(attr, val);
   });
   document.documentElement.lang = locale;
   document.documentElement.dir = locale === "ar" ? "rtl" : "ltr";

@@ -1,4 +1,4 @@
-const CACHE = "coh-ucs-v6";
+const CACHE = "coh-ucs-v7";
 const ASSETS = [
   "/",
   "/static/css/fonts.css",

@@ -27,19 +27,29 @@ STATIC_SRC = ROOT / "webapp" / "static"
 DEFAULT_API_BASE = "https://coh-ucs-tools.fly.dev"
 DEFAULT_SITE_URL = "https://benmed00.github.io/coh-ucs-tools"
 
-# Map /static/... URLs in source to relative paths in dist/.
-_PATH_REWRITES = (
-    ("/static/css/", "./css/"),
-    ("/static/js/", "./js/"),
-    ("/static/fonts/", "./fonts/"),
-    ("/static/i18n/", "./i18n/"),
-    ("/static/icons/", "./icons/"),
-    ("/static/manifest.json", "./manifest.json"),
-    ("/static/service-worker.js", "./service-worker.js"),
-    ('href="/sitemap.xml"', 'href="./sitemap.xml"'),
-)
+def _rewrite_static_paths(text: str, *, base_path: str = "", depth: int = 0) -> str:
+    if base_path:
+        prefix = base_path.rstrip("/") + "/"
+    elif depth:
+        prefix = "../" * depth
+    else:
+        prefix = "./"
+    rewrites = (
+        ("/static/css/", f"{prefix}css/"),
+        ("/static/js/", f"{prefix}js/"),
+        ("/static/fonts/", f"{prefix}fonts/"),
+        ("/static/i18n/", f"{prefix}i18n/"),
+        ("/static/icons/", f"{prefix}icons/"),
+        ("/static/manifest.json", f"{prefix}manifest.json"),
+        ("/static/service-worker.js", f"{prefix}service-worker.js"),
+        ('href="/sitemap.xml"', f'href="{prefix}sitemap.xml"'),
+    )
+    for old, new in rewrites:
+        text = text.replace(old, new)
+    return text
 
-_SW_CACHE = "coh-ucs-v6"
+
+_SW_CACHE = "coh-ucs-v9"
 
 # Service-worker cache list uses absolute /static/ paths in source.
 _SW_ASSETS = (
@@ -48,6 +58,7 @@ _SW_ASSETS = (
     "./css/app.css",
     "./js/config.js",
     "./js/router.js",
+    "./js/routeScope.js",
     "./js/seo.js",
     "./js/i18n.js",
     "./js/app.js",
@@ -65,12 +76,6 @@ _SW_ASSETS = (
     "./i18n/fr.json",
     "./i18n/ar.json",
 )
-
-
-def _rewrite_static_paths(text: str) -> str:
-    for old, new in _PATH_REWRITES:
-        text = text.replace(old, new)
-    return text
 
 
 def _rewrite_site_url(text: str, site_url: str) -> str:
@@ -212,11 +217,29 @@ def build_static(out_dir: Path, api_base: str, site_url: str) -> None:
 
     base_path = _base_path_for_site(site_url)
     index_src = (STATIC_SRC / "index.html").read_text(encoding="utf-8")
-    index_out = inject_index_html(index_src, base_url=site_url, base_path=base_path)
-    index_out = _rewrite_static_paths(index_out)
-    index_out = _rewrite_site_url(index_out, site_url)
-    (out_dir / "index.html").write_text(index_out, encoding="utf-8")
-    (out_dir / "404.html").write_text(index_out, encoding="utf-8")
+
+    def _write_route_html(slug: str | None, dest: Path) -> None:
+        depth = 0 if slug is None else 1
+        html = inject_index_html(
+            index_src,
+            base_url=site_url,
+            base_path=base_path,
+            route_slug=slug,
+        )
+        html = _rewrite_static_paths(html, base_path=base_path, depth=depth)
+        html = _rewrite_site_url(html, site_url)
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        dest.write_text(html, encoding="utf-8")
+
+    _write_route_html(None, out_dir / "index.html")
+    _write_route_html(None, out_dir / "404.html")
+
+    from webapp.seo import SPA_ROUTES
+
+    for slug, _title, _desc in SPA_ROUTES:
+        if slug == "dashboard":
+            continue
+        _write_route_html(slug, out_dir / slug / "index.html")
 
     seo_dir = STATIC_SRC / "seo"
     if seo_dir.is_dir():

@@ -45,6 +45,31 @@ class SeoModuleTests(unittest.TestCase):
         self.assertFalse(is_spa_path("api/health"))
         self.assertFalse(is_spa_path("static/js/app.js"))
 
+    def test_about_route_has_static_faq_schema(self) -> None:
+        from webapp.seo import inject_index_html
+
+        raw = (Path(__file__).resolve().parent.parent / "webapp" / "static" / "index.html").read_text(
+            encoding="utf-8"
+        )
+        html = inject_index_html(raw, route_slug="about")
+        self.assertIn('id="seo-faq-ld"', html)
+        self.assertIn('"@type": "FAQPage"', html)
+        self.assertIn("about-prerender", html)
+        self.assertIn('class="faq-item"', html)
+        self.assertIn("About — CoH UCS Tools", html)
+        self.assertIn('rel="canonical" href="https://benmed00.github.io/coh-ucs-tools/about"', html)
+
+    def test_upload_route_has_breadcrumb_schema(self) -> None:
+        from webapp.seo import inject_index_html
+
+        raw = (Path(__file__).resolve().parent.parent / "webapp" / "static" / "index.html").read_text(
+            encoding="utf-8"
+        )
+        html = inject_index_html(raw, route_slug="upload")
+        self.assertIn('id="seo-breadcrumb-ld"', html)
+        self.assertIn("Upload &amp; Analyze — CoH UCS Tools", html)
+        self.assertNotIn('id="seo-faq-ld"', html)
+
     def test_inject_index_html(self) -> None:
         from webapp.seo import inject_index_html
 
@@ -159,6 +184,8 @@ class SeoRouteTests(unittest.TestCase):
         res = self.client.get("/about")
         self.assertEqual(res.status_code, 200)
         self.assertIn("window.ABOUT_FAQ=", res.text)
+        self.assertIn('id="seo-faq-ld"', res.text)
+        self.assertIn("about-prerender", res.text)
 
     def test_google_verification_html_route(self) -> None:
         res = self.client.get("/google34239ced659ea41b.html")
@@ -228,12 +255,19 @@ class BuildStaticSeoTests(unittest.TestCase):
             self.assertIn("window.BASE_PATH", (out / "js" / "config.js").read_text(encoding="utf-8"))
             self.assertIn("/coh-ucs-tools", (out / "js" / "config.js").read_text(encoding="utf-8"))
             self.assertIn("<noscript>", index)
-            self.assertIn("./css/fonts.css", index)
+            self.assertIn("/coh-ucs-tools/css/fonts.css", index)
             self.assertNotIn("fonts.googleapis.com", index)
             self.assertTrue((out / "_headers").is_file())
             sitemap = (out / "sitemap.xml").read_text(encoding="utf-8")
             self.assertIn("/coh-ucs-tools/upload</loc>", sitemap)
             self.assertNotIn("/docs</loc>", sitemap)
+            about = (out / "about" / "index.html").read_text(encoding="utf-8")
+            self.assertIn('id="seo-faq-ld"', about)
+            self.assertIn("/coh-ucs-tools/css/fonts.css", about)
+            upload = (out / "upload" / "index.html").read_text(encoding="utf-8")
+            self.assertIn('id="seo-breadcrumb-ld"', upload)
+            self.assertIn("/coh-ucs-tools/js/config.js", upload)
+            self.assertNotIn('id="seo-faq-ld"', upload)
 
 
 if __name__ == "__main__":

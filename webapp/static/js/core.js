@@ -1,6 +1,31 @@
 /* Shared SPA utilities */
 
-export const view = document.getElementById("view");
+import { t, getLocaleTag } from "./i18n.js";
+import { routePath } from "./router.js";
+import { isRouteAbortError, routeAlive, routeSignal } from "./routeScope.js";
+
+/** Main content mount (lazy — safe if modules load before #view exists). */
+export function getView() {
+  return document.getElementById("view");
+}
+
+/** @deprecated prefer setViewHtml() from routeScope.js */
+export const view = {
+  set innerHTML(html) {
+    const el = getView();
+    if (el) el.innerHTML = html;
+  },
+  get innerHTML() {
+    return getView()?.innerHTML ?? "";
+  },
+  querySelector(sel) {
+    return getView()?.querySelector(sel) ?? null;
+  },
+  querySelectorAll(sel) {
+    return getView()?.querySelectorAll(sel) ?? [];
+  },
+};
+
 export const toastEl = document.getElementById("toast");
 
 export function esc(s) {
@@ -37,9 +62,11 @@ export async function api(path, opts = {}) {
   if (storedKey && !headers.has("X-API-Key")) {
     headers.set("X-API-Key", storedKey);
   }
-  // Cross-origin hybrid UI uses X-API-Key only — cookies/OAuth sessions need same-site monolith.
   const credentials = isHybridUi() ? "omit" : "include";
-  const res = await fetch(apiUrl(path), { credentials, ...opts, headers });
+  const signal = opts.signal ?? routeSignal();
+  const fetchOpts = { credentials, ...opts, headers };
+  if (signal) fetchOpts.signal = signal;
+  const res = await fetch(apiUrl(path), fetchOpts);
   if (res.status === 204) return null;
   let body = null;
   try { body = await res.json(); } catch { /* non-JSON */ }
@@ -50,7 +77,63 @@ export async function api(path, opts = {}) {
   return body;
 }
 
-export function fmt(n) { return Number(n).toLocaleString("en-US"); }
+export function fmt(n) { return Number(n).toLocaleString(getLocaleTag()); }
+
+/** Friendly route-level error panel with optional retry. */
+export function renderRouteError(err, { retry } = {}) {
+  if (!routeAlive()) return;
+  const mount = getView();
+  if (!mount) return;
+  const msg = String(err?.message || err || "");
+  let friendly = t("err.generic");
+  let hint = "";
+  if (/^404\b/.test(msg)) {
+    friendly = t("err.404");
+    hint = t("err.404_hint");
+  } else if (/^401\b/.test(msg)) {
+    friendly = t("err.401");
+    hint = t("err.401_hint");
+  } else if (/^429\b/.test(msg)) {
+    friendly = t("err.429");
+  } else if (/failed to fetch|networkerror/i.test(msg)) {
+    friendly = t("err.network");
+  }
+  const settingsLink = `<a href="${routePath("settings")}">${t("nav.settings")}</a>`;
+  mount.innerHTML = `
+    <div class="banner error">
+      <strong>${esc(friendly)}</strong>
+      ${hint ? `<p class="muted mt-sm">${hint.replace("{settings}", settingsLink)}</p>` : ""}
+      ${retry ? `<div class="btn-row mt-sm"><button type="button" class="btn ghost small" id="err-retry">${t("btn.retry")}</button></div>` : ""}
+      <details class="mt-sm"><summary>${t("err.details")}</summary>
+        <pre class="mono-block">${esc(msg)}</pre></details>
+    </div>`;
+  mount.querySelector("#err-retry")?.addEventListener("click", () => retry());
+}
+
+export { isRouteAbortError };
+
+/** Compact error panel for a sub-region (compare results, webhook log, etc.). */
+export function renderPaneError(err, paneId, { retry } = {}) {
+  if (!routeAlive()) return false;
+  const msg = String(err?.message || err || "");
+  let friendly = t("err.generic");
+  if (/^404\b/.test(msg)) friendly = t("err.404");
+  else if (/^401\b/.test(msg)) friendly = t("err.401");
+  else if (/^429\b/.test(msg)) friendly = t("err.429");
+  else if (/failed to fetch|networkerror/i.test(msg)) friendly = t("err.network");
+  const html = `
+    <div class="banner error">
+      <strong>${esc(friendly)}</strong>
+      ${retry ? `<div class="btn-row mt-sm"><button type="button" class="btn ghost small pane-retry">${t("btn.retry")}</button></div>` : ""}
+      <details class="mt-sm"><summary>${t("err.details")}</summary>
+        <pre class="mono-block">${esc(msg)}</pre></details>
+    </div>`;
+  const el = document.getElementById(paneId);
+  if (!el || !routeAlive()) return false;
+  el.innerHTML = html;
+  el.querySelector(".pane-retry")?.addEventListener("click", () => retry?.());
+  return true;
+}
 
 export function fileLabel(f) {
   const tag = { upload: "UPL", version: "VER", generated: "GEN" }[f.kind] || "?";
@@ -79,11 +162,11 @@ export function profileBarHtml() {
   const p = sessionStorage.getItem("coh-last-profile") || "coh1";
   const strict = sessionStorage.getItem("coh-strict-profile") === "true";
   const opts = [
-    ["coh1", "CoH 1"], ["coh2", "CoH 2"], ["dow1", "Dawn of War"], ["dow2", "DoW II"],
+    ["coh1", t("game.coh1")], ["coh2", t("game.coh2")], ["dow1", t("game.dow1")], ["dow2", t("game.dow2")],
   ].map(([v, l]) => `<option value="${v}" ${p === v ? "selected" : ""}>${l}</option>`).join("");
-  return `<div class="form-row profile-bar" style="margin-bottom:12px">
-    <label class="field">Game profile<select id="gp-select">${opts}</select></label>
-    <label class="toggle"><input type="checkbox" id="gp-strict" ${strict ? "checked" : ""}> Block mismatch</label>
+  return `<div class="form-row profile-bar mb-sm">
+    <label class="field">${t("label.game_profile")}<select id="gp-select">${opts}</select></label>
+    <label class="toggle"><input type="checkbox" id="gp-strict" ${strict ? "checked" : ""}> ${t("label.block_mismatch")}</label>
   </div>`;
 }
 
@@ -145,7 +228,20 @@ export async function makeChart(ctx, cfg) {
   return c;
 }
 
-export const CHART_COLORS = { amber: "#ffb648", olive: "#8a9a5b", green: "#9acd68", red: "#e06c4f", dim: "#8f8c77" };
+export function getChartColors() {
+  const s = getComputedStyle(document.documentElement);
+  const pick = v => s.getPropertyValue(v).trim() || undefined;
+  return {
+    amber: pick("--amber") || "#ffb648",
+    olive: pick("--olive") || "#8a9a5b",
+    green: pick("--green") || "#9acd68",
+    red: pick("--red") || "#e06c4f",
+    dim: pick("--text-dim") || "#8f8c77",
+  };
+}
+
+/** @deprecated use getChartColors() */
+export const CHART_COLORS = getChartColors();
 
 export function exportChartPng(canvasId, name = "chart.png") {
   const c = document.getElementById(canvasId);

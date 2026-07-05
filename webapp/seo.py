@@ -252,14 +252,15 @@ def sitemap_xml(
 
 def json_ld_webapp(*, base_url: str | None = None) -> dict:
     origin = (base_url or ui_site_url()).rstrip("/")
+    org_id = f"{origin}/#organization"
     data: dict = {
-        "@context": "https://schema.org",
         "@type": "WebApplication",
+        "@id": f"{origin}/#webapp",
         "name": SITE_NAME,
         "alternateName": "CoH UCS Toolkit",
         "description": SITE_DESCRIPTION,
         "url": origin + "/",
-        "applicationCategory": "DeveloperApplication",
+        "applicationCategory": "https://schema.org/DeveloperApplication",
         "operatingSystem": "Any",
         "browserRequirements": "Requires JavaScript",
         "softwareVersion": "1.0.0",
@@ -267,6 +268,7 @@ def json_ld_webapp(*, base_url: str | None = None) -> dict:
         "license": "https://opensource.org/licenses/MIT",
         "codeRepository": GITHUB_REPO,
         "screenshot": og_image_url(origin),
+        "publisher": {"@id": org_id},
         "featureList": [
             "UCS file upload and validation",
             "Duplicate and missing ID detection",
@@ -288,21 +290,23 @@ def json_ld_webapp(*, base_url: str | None = None) -> dict:
 
 def json_ld_website(*, base_url: str | None = None) -> dict:
     full = (base_url or ui_site_url()).rstrip("/")
-    origin, path_prefix = _split_origin(full)
+    _origin, path_prefix = _split_origin(full)
     search_path = canonical_path("search", base_path=path_prefix)
+    org_id = f"{full}/#organization"
     return {
-        "@context": "https://schema.org",
         "@type": "WebSite",
+        "@id": f"{full}/#website",
         "name": SITE_NAME,
         "alternateName": "CoH UCS Toolkit",
         "description": SITE_DESCRIPTION,
-        "url": origin + canonical_path("dashboard", base_path=path_prefix),
+        "url": full + canonical_path("dashboard", base_path=path_prefix),
         "inLanguage": "en",
+        "publisher": {"@id": org_id},
         "potentialAction": {
             "@type": "SearchAction",
             "target": {
                 "@type": "EntryPoint",
-                "urlTemplate": origin + search_path + "?q={search_term_string}",
+                "urlTemplate": full + search_path + "?q={search_term_string}",
             },
             "query-input": "required name=search_term_string",
         },
@@ -311,12 +315,20 @@ def json_ld_website(*, base_url: str | None = None) -> dict:
 
 def json_ld_organization(*, base_url: str | None = None) -> dict:
     origin = (base_url or ui_site_url()).rstrip("/")
+    logo_url = og_image_url(origin)
     return {
-        "@context": "https://schema.org",
         "@type": "Organization",
+        "@id": f"{origin}/#organization",
         "name": SITE_NAME,
+        "description": SITE_DESCRIPTION,
         "url": origin + "/",
-        "logo": og_image_url(origin),
+        "logo": {
+            "@type": "ImageObject",
+            "url": logo_url,
+            "width": 1200,
+            "height": 630,
+            "contentUrl": logo_url,
+        },
         "sameAs": [GITHUB_REPO],
     }
 
@@ -331,7 +343,6 @@ def json_ld_breadcrumb(
     origin, path_prefix = _split_origin(full)
     page_title = title or next((t for s, t, _ in SPA_ROUTES if s == slug), slug)
     return {
-        "@context": "https://schema.org",
         "@type": "BreadcrumbList",
         "itemListElement": [
             {
@@ -354,7 +365,6 @@ def json_ld_faq_page(*, base_url: str | None = None) -> dict:
     full = (base_url or ui_site_url()).rstrip("/")
     origin, path_prefix = _split_origin(full)
     return {
-        "@context": "https://schema.org",
         "@type": "FAQPage",
         "mainEntity": [
             {
@@ -379,7 +389,97 @@ def _verification_meta_tags() -> str:
     return "\n".join(tags)
 
 
+def render_route_head_meta(slug: str, *, base_url: str | None = None) -> str:
+    """Per-route title, description, canonical, and social tags."""
+    full = (base_url or ui_site_url()).rstrip("/")
+    origin, path_prefix = _split_origin(full)
+    seo = route_seo_map().get(slug, {})
+    route_title = seo.get("title", "Dashboard")
+    description = seo.get("description", SITE_DESCRIPTION)
+    page_title = f"{route_title} — {SITE_NAME}"
+    canonical = origin + canonical_path(slug, base_path=path_prefix)
+    img = og_image_url(full)
+    return f"""<title>{escape(page_title)}</title>
+<meta name="description" content="{escape(description)}">
+<meta name="keywords" content="{escape(SITE_KEYWORDS)}">
+<meta name="author" content="{escape(SITE_NAME)}">
+<meta name="robots" content="index, follow, max-snippet:-1, max-image-preview:large">
+<meta name="application-name" content="{escape(SITE_NAME)}">
+
+<link rel="canonical" href="{escape(canonical)}">
+<link rel="icon" href="/static/icons/favicon.svg" type="image/svg+xml">
+<link rel="icon" href="/static/icons/icon-192.png" type="image/png" sizes="192x192">
+<link rel="apple-touch-icon" href="/static/icons/apple-touch-icon.png" sizes="180x180">
+<link rel="manifest" href="/static/manifest.json">
+<meta name="theme-color" content="#1a3a2a">
+<meta name="color-scheme" content="dark">
+
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="{escape(SITE_NAME)}">
+<meta property="og:title" content="{escape(page_title)}">
+<meta property="og:description" content="{escape(description)}">
+<meta property="og:url" content="{escape(canonical)}">
+<meta property="og:image" content="{escape(img)}">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="{escape(SITE_NAME)} — Company of Heroes localization command console">
+<meta property="og:locale" content="en_US">
+
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="{escape(page_title)}">
+<meta name="twitter:description" content="{escape(description)}">
+<meta name="twitter:image" content="{escape(img)}">
+<meta name="twitter:image:alt" content="{escape(SITE_NAME)} — Company of Heroes localization command console">
+{_verification_meta_tags()}"""
+
+
+def render_faq_json_ld_script(*, base_url: str | None = None) -> str:
+    payload = json.dumps(
+        {"@context": "https://schema.org", **json_ld_faq_page(base_url=base_url)},
+        indent=2,
+    )
+    return f'<script type="application/ld+json" id="seo-faq-ld">\n{payload}\n</script>'
+
+
+def render_breadcrumb_json_ld_script(slug: str, *, base_url: str | None = None) -> str:
+    payload = json.dumps(
+        {"@context": "https://schema.org", **json_ld_breadcrumb(slug, base_url=base_url)},
+        indent=2,
+    )
+    return f'<script type="application/ld+json" id="seo-breadcrumb-ld">\n{payload}\n</script>'
+
+
+def render_about_prerender(*, base_path: str = "") -> str:
+    """Visible About + FAQ HTML for crawlers and no-JS fallback."""
+    prefix = base_path.rstrip("/")
+    about_href = f"{prefix}/about" if prefix else "/about"
+    upload_href = f"{prefix}/upload" if prefix else "/upload"
+    _, about_title, about_desc = next(row for row in SPA_ROUTES if row[0] == "about")
+    faq_blocks = []
+    for q, a in ABOUT_FAQ:
+        faq_blocks.append(
+            f'        <details class="faq-item">\n'
+            f"          <summary>{escape(q)}</summary>\n"
+            f"          <p>{escape(a)}</p>\n"
+            f"        </details>"
+        )
+    faq_html = "\n".join(faq_blocks)
+    return f"""<article class="about-page about-prerender">
+      <h2 class="section-title">{escape(about_title)}</h2>
+      <p class="section-sub">{escape(about_desc)}</p>
+      <p>{escape(SITE_DESCRIPTION)}</p>
+      <h3 class="about-heading">Frequently asked questions</h3>
+      <div class="faq-list">
+{faq_html}
+      </div>
+      <p class="about-footer"><a href="{escape(upload_href)}">Open the console</a>
+        · <a href="{escape(GITHUB_REPO)}">Source on GitHub</a>
+        · <a href="{escape(about_href)}">About</a></p>
+    </article>"""
+
+
 def render_head_meta(*, base_url: str | None = None) -> str:
+    """Default (dashboard) head metadata."""
     origin = (base_url or ui_site_url()).rstrip("/")
     title = page_title_suffix()
     img = og_image_url(origin)
@@ -465,31 +565,63 @@ def render_noscript_fallback(*, base_path: str = "") -> str:
   </noscript>"""
 
 
-def inject_index_html(html: str, *, base_url: str | None = None, base_path: str = "") -> str:
+def _replace_block(html: str, start: str, end: str, content: str) -> str:
+    """Replace a marked HTML block without interpreting backslashes in *content*."""
+    if start not in html:
+        return html
+    replacement = f"{start}\n{content}\n{end}"
+    return re.sub(
+        rf"{re.escape(start)}.*?{re.escape(end)}",
+        lambda _m: replacement,
+        html,
+        count=1,
+        flags=re.DOTALL,
+    )
+
+
+def inject_index_html(
+    html: str,
+    *,
+    base_url: str | None = None,
+    base_path: str = "",
+    route_slug: str | None = None,
+) -> str:
     """Replace SEO markers in index.html with generated metadata."""
-    head_block = "\n".join([
-        render_head_meta(base_url=base_url),
-        render_json_ld_script(base_url=base_url),
-        render_route_seo_script(),
-    ])
-    if SEO_HEAD_START in html:
+    slug = route_slug or "dashboard"
+    head_meta = (
+        render_route_head_meta(slug, base_url=base_url)
+        if slug != "dashboard"
+        else render_head_meta(base_url=base_url)
+    )
+    ld_parts = [render_json_ld_script(base_url=base_url)]
+    if slug == "about":
+        ld_parts.append(render_faq_json_ld_script(base_url=base_url))
+    if slug != "dashboard":
+        ld_parts.append(render_breadcrumb_json_ld_script(slug, base_url=base_url))
+    head_block = "\n".join([head_meta, *ld_parts, render_route_seo_script()])
+    html = _replace_block(html, SEO_HEAD_START, SEO_HEAD_END, head_block)
+    html = _replace_block(html, SEO_NOSCRIPT_START, SEO_NOSCRIPT_END, render_noscript_fallback(base_path=base_path))
+    if slug == "about":
+        prerender = render_about_prerender(base_path=base_path)
         html = re.sub(
-            rf"{re.escape(SEO_HEAD_START)}.*?{re.escape(SEO_HEAD_END)}",
-            f"{SEO_HEAD_START}\n{head_block}\n{SEO_HEAD_END}",
-            html,
-            count=1,
-            flags=re.DOTALL,
-        )
-    noscript = render_noscript_fallback(base_path=base_path)
-    if SEO_NOSCRIPT_START in html:
-        html = re.sub(
-            rf"{re.escape(SEO_NOSCRIPT_START)}.*?{re.escape(SEO_NOSCRIPT_END)}",
-            f"{SEO_NOSCRIPT_START}\n{noscript}\n{SEO_NOSCRIPT_END}",
+            r'<div class="loading"[^>]*>.*?</div>',
+            lambda _m: prerender,
             html,
             count=1,
             flags=re.DOTALL,
         )
     return html
+
+
+def spa_route_slug(path: str) -> str | None:
+    """Return the first SPA slug segment from *path*, or None for dashboard."""
+    path = path.strip("/")
+    if not path:
+        return None
+    slug = path.split("/")[0]
+    if slug in _SPA_RESERVED_PREFIXES:
+        return None
+    return slug if slug in SPA_SLUGS else None
 
 
 def is_spa_path(path: str) -> bool:
