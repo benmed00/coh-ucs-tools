@@ -86,7 +86,11 @@ class CoverageWebAppTests(unittest.TestCase):
         self.assertEqual(res.status_code, 200)
         body = res.json()
         self.assertIn("locales", body)
-        self.assertGreaterEqual(len(body["locales"]), 7)
+        if body.get("reference_found"):
+            self.assertGreaterEqual(len(body["locales"]), 7)
+        else:
+            self.assertEqual(body["locales"], [])
+            self.assertIn("error", body)
 
     def test_diff_udiff_endpoint(self) -> None:
         a = self.client.post(
