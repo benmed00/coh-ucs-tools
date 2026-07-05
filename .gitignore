@@ -3,6 +3,7 @@ report/
 *.merged.ucs
 uploads/
 *.complete.ucs
+*.MT.ucs
 
 # downloaded / recovered game data (copyrighted text - never commit)
 downloads/

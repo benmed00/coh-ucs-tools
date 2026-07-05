@@ -2,7 +2,8 @@
 
 ![Python 3.12](https://img.shields.io/badge/python-3.12-blue)
 ![License: MIT](https://img.shields.io/badge/license-MIT-green)
-![Tests](https://img.shields.io/badge/tests-38%20passing-brightgreen)
+![Tests](https://github.com/benmed00/coh-ucs-tools/actions/workflows/test.yml/badge.svg)
+![Tests local](https://img.shields.io/badge/tests-64%20passing-brightgreen)
 
 Comparison, validation, search and migration tooling for Company of Heroes
 `.ucs` localization files (`RelicCOH.Russian.ucs` / `RelicCOH.English.ucs`) —
@@ -25,7 +26,9 @@ of the official English localization, and its verification — is in
 - [CLI usage](#cli-usage)
 - [Web application](#web-application)
 - [Recovered official English text](#recovered-official-english-text)
+- [French localization](#french-localization)
 - [Machine translation cross-check](#machine-translation-cross-check-translatepy)
+- [Arabic localization (unofficial)](#arabic-localization-unofficial)
 - [Report](#report)
 - [Tests](#tests)
 - [Documentation](#documentation)
@@ -212,37 +215,26 @@ pip install -r requirements.txt
 python -m uvicorn webapp.main:app --reload
 ```
 
-Then open <http://127.0.0.1:8000> — a dark WW2 command-console themed SPA
-(vanilla JS ES modules, no build step; Three.js hero animation and Chart.js
-from CDN) with five sections: **Dashboard** (registered version registry with
-key-count bars), **Upload & Analyze** (drag-drop parsing, validation,
-searchable entry browser with regex toggle), **Compare** (coverage %, missing
-ranges, charts), **Merge** (placeholder / fill-from-source) and **Tools**
-(curated external references).
+Then open <http://127.0.0.1:8000> — dark WW2 command-console theme with
+**light theme toggle** (Settings), vanilla JS ES modules (no build step),
+Three.js locale globe (click pins → Languages hub), Chart.js coverage donuts.
 
-* Interactive Swagger/OpenAPI docs: <http://127.0.0.1:8000/docs>
-  (ReDoc at `/redoc`, raw spec at `/openapi.json`)
-* Built-in registry of known CoH1 UCS versions: version files found on this
-  machine are copied into read-only server storage at startup —
-  **original game files are never modified**
-* Server-side state lives in `uploads/` (gitignored): `files/` for uploads,
-  `versions/` for read-only version copies, `generated/` for merge results
+**SPA sections:** Dashboard · Upload & Analyze · Compare · **Diff** ·
+**Ranges heatmap** · **Validator** · **Languages hub** · **Merge wizard**
+(preview) · Install detect · **MT lab** · **Glossary** · **Timeline** ·
+**Depots & Sources** · **Global search** (fuzzy/regex) · **Bookmarks** ·
+**Patch builder** · **SGA browser** · Settings · Tools
+
+* Interactive Swagger/OpenAPI: <http://127.0.0.1:8000/docs>
+* Built-in CoH1 UCS version registry (read-only copies at startup)
+* State: `uploads/` (gitignored) + `webapp/storage/` (glossary, bookmarks, audit, MT status)
+* Optional `UCS_API_KEY` env for API key middleware; 24 h upload cleanup on startup
 
 ### REST API surface
 
-| Method | Path | Purpose |
-|--------|------|---------|
-| POST   | `/api/files` | multipart `.ucs` upload (max 20 MB) → file id + parse summary |
-| GET    | `/api/files`, `/api/files/{id}` | list stored files / one summary |
-| DELETE | `/api/files/{id}` | delete an upload or merge result (versions are protected) |
-| GET    | `/api/files/{id}/entries?offset=&limit=&search=&regex=` | paginated, searchable entry browser |
-| GET    | `/api/files/{id}/validate` | validation issues (duplicates, invalid lines, bad chars, …) |
-| GET    | `/api/compare?a=&b=` | coverage statistics + missing-id ranges both ways |
-| POST   | `/api/merge` | `{target_id, source_id, mode}` → merged file + download URL |
-| GET    | `/api/downloads/{id}` | stream any stored file with content-disposition |
-| GET    | `/api/versions`, `/api/versions/{id}/download` | known CoH1 UCS version registry |
-| GET    | `/api/tools` | curated external tools/references JSON |
-| GET    | `/api/health` | health check |
+Core endpoints plus extended analysis/localization/search — see
+[`docs/API.md`](docs/API.md) for the full table (diff, fingerprint, batch
+compare, patch build, crossref, …).
 
 Endpoint reference: [`docs/API.md`](docs/API.md#rest-api). The API delegates
 to the exact same core modules as the CLI.
@@ -260,6 +252,59 @@ file plus the 157 legacy-only THQ keys.
 Recovered/generated game files contain copyrighted text and are **not part
 of this repository** (see `.gitignore`). The full recovery story and
 verification results are in [`docs/PROJECT_REPORT.md`](docs/PROJECT_REPORT.md).
+
+## French localization
+
+Company of Heroes 1 **was officially released in French**. The Legacy Edition /
+New Steam Version French depot (SteamDB depot **4565**, app 4560) ships the full
+loose file `CoH/Engine/Locale/French/RelicCoH.French.ucs` (~2.35 MiB) — the
+French counterpart of the recovered NSV English file.
+
+On this machine the Complete Edition install has **no** `French` locale folder
+(only English and Russian under `CoH\Engine\Locale\`), THQ retail has no French
+UCS, and no community-shared French download was found (unlike the [NSV English
+Dropbox](https://www.dropbox.com/s/mzsmb0w42ua1z15/RelicCOH.English.ucs?dl=0)
+from the Steam forums). **DepotDownloader** was installed; anonymous Steam login
+works but depot 4565 cannot be pulled without an account that owns Legacy
+Edition.
+
+### Building `RelicCOH.French.complete.ucs`
+
+Place the recovered official French file at `downloads/RelicCOH.French.NSV.ucs`
+(from your Steam French depot via DepotDownloader, a friend's install, or a
+language-pack copy), then:
+
+```powershell
+python build_french.py
+python build_french.py --search-only    # local search + report only
+python build_french.py --nsv "D:\path\RelicCOH.French.ucs"
+```
+
+The build mirrors English complete: **official French NSV** as base, union any
+**legacy-only THQ retail French** keys (if present), then `<MISSING>` only for
+Russian CE ids with no French source. **No machine translation** is written into
+the game file.
+
+Outputs (gitignored when they contain game text):
+
+| File | Purpose |
+|---|---|
+| `RelicCOH.French.complete.ucs` | Union build (official French only + placeholders) |
+| `downloads/RelicCOH.French.NSV.ucs` | Recovered official French source (you provide) |
+| `report/french/` | `french_keys.txt`, `missing_in_french.txt`, `statistics.json`, search/recovery notes |
+
+### Installing French in-game
+
+1. Create `CoH\Engine\Locale\French\` if missing (Complete Edition often ships
+   without it).
+2. Copy `RelicCOH.French.complete.ucs` →
+   `CoH\Engine\Locale\French\RelicCOH.French.ucs` (rename on install).
+3. Point the game at French via `CoH\locale.ini` (set the active language
+   folder to `French`). Some editions also use a top-level `Locale.ini`.
+4. Back up originals; **never overwrite** stock files without a `.bak`.
+
+THQ retail path: `Engine\Locale\French\RelicCOH.French.ucs`. Complete Edition
+path: `CoH\Engine\Locale\French\RelicCOH.French.ucs`.
 
 ## Machine translation cross-check (`translate.py`)
 
@@ -284,6 +329,55 @@ stripped, case/punctuation ignored). Outputs:
 MT output is used **only for validating** the recovered official text — it is
 never written into a game file.
 
+## Arabic localization (unofficial)
+
+Company of Heroes 1 was **never officially released in Arabic**. There is no
+`RelicCOH.Arabic.ucs` in Steam depots or THQ retail installs, and no widely
+circulated community Arabic UCS patch was found (local CE install and web
+search documented in `report/arabic/search_results.json`).
+
+The deliverable is a clearly labeled **machine-translation artifact**:
+
+| File | Purpose |
+|---|---|
+| `RelicCOH.Arabic.MT.ucs` | Fan MT (en→ar) from `RelicCOH.English.complete.ucs` |
+| `downloads/mt_ar_cache.json` | Resumable MT checkpoint (gitignored) |
+| `report/arabic/` | Statistics, validation, 50-key EN vs AR sample TSV |
+
+```powershell
+python build_arabic.py --limit 200    # pilot run
+python build_arabic.py                # full build (resumes from cache)
+python build_arabic.py --report-only  # rebuild report from cache + existing UCS
+```
+
+**Important caveats:**
+
+* This is **unofficial fan machine translation** (Google Translate public
+  endpoint), **not** Relic/THQ official text. Do not present it as an official
+  localization.
+* UCS format tokens (`%1%`, `%1NAME%`, etc.) are stripped to placeholders
+  before MT and restored afterward so format strings stay intact.
+* The CoH1 engine may **not render right-to-left Arabic correctly** in menus
+  and UI (LTR layout, cursive joining, mixed Latin/Arabic strings). Expect
+  display issues even when the UCS file is valid UTF-16-LE.
+* Generated `.ucs` / MT cache files contain copyrighted source text and are
+  **gitignored** — never commit them.
+
+### Installing Arabic MT in-game
+
+1. Create the locale folder (game does not ship one):
+   `CoH\Engine\Locale\Arabic\`
+2. Copy `RelicCOH.Arabic.MT.ucs` →
+   `CoH\Engine\Locale\Arabic\RelicCOH.Arabic.ucs`
+   (rename on install; the `.MT` suffix marks the unofficial build artifact).
+3. Point the game at Arabic — typically by editing `CoH\locale.ini` (or the
+   mod's `Locale.ini`) to set the active language folder to `Arabic`. Exact
+   steps vary by edition/mod; back up originals first.
+4. **Never overwrite** the stock `English` or `Russian` UCS files.
+
+No conflict with other in-progress locale work (e.g. French): Arabic output
+uses separate filenames (`RelicCOH.Arabic.MT.ucs`).
+
 ## Report
 
 `python cli.py compare` produces:
@@ -307,11 +401,12 @@ Coverage is computed against the union of both key sets.
 python -m unittest discover -s tests -v
 ```
 
-38 tests: 29 cover the core toolkit — parsing (BOM, encodings, tabs in
+45 tests: 36 cover the core toolkit and `build_french.py` — parsing (BOM, encodings, tabs in
 values, duplicates, invalid lines), writing (round-trip, overwrite
 protection), validation (all issue codes), range compression, comparison
 statistics, merge behaviour (placeholders only, numeric sorting,
-original-file protection) and numeric key sorting. 9 more
+original-file protection), numeric key sorting, and MT token preservation
+(`protect_tokens` / `restore_tokens`). 9 more
 (`tests/test_webapp.py`, FastAPI TestClient) cover the REST API happy path
 (upload → analyze → compare → merge → download) and its error cases.
 

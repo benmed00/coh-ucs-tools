@@ -258,5 +258,45 @@ All endpoints are prefixed with `/api`.
 | `GET` | `/api/tools` | Curated external tools & references (Mod Studio, DepotDownloader, SteamDB…) |
 | `GET` | `/api/health` | Health check: status, file and version counts |
 
+### Extended endpoints (v1.1)
+
+| Method | Path | Purpose |
+|---|---|---|
+| `GET` | `/api/files/{id}/diff/{other}?filter=&offset=&limit=` | Entry-level diff (changed/missing/empty/token_mismatch) |
+| `GET` | `/api/compare/{a}/{b}/ranges` | Missing-id heatmap buckets |
+| `GET` | `/api/files/{id}/lint` | Format-token + script lint summary |
+| `GET` | `/api/files/{id}/issues`, `…/issues.csv` | Duplicates + invalid lines (CSV export) |
+| `GET` | `/api/files/{id}/fingerprint` | sha256, BOM, encoding, NSV match |
+| `GET` | `/api/languages` | Localization hub cards (EN/FR/AR/RU) |
+| `POST` | `/api/merge/preview` | Preview first N merge changes |
+| `GET` | `/api/install/detect` | Scan known install paths + PowerShell commands |
+| `POST` | `/api/mt/queue`, `GET …/status`, `GET …/report` | Background MT QA jobs |
+| `GET`/`PUT` | `/api/glossary` | MT post-processing glossary (`webapp/storage/glossary.json`) |
+| `GET` | `/api/versions/timeline` | Version history timeline |
+| `GET` | `/api/depots`, `/api/sources` | Steam depot cards + community registry |
+| `GET` | `/api/search/global`, `/api/crossref/{key}` | Cross-version search + cross-reference |
+| `GET`/`POST`/`DELETE` | `/api/bookmarks` | Persisted QA id list |
+| `POST` | `/api/batch/compare`, `GET …/{job_id}/zip` | All-pairs comparison zip |
+| `GET` | `/api/export/openapi-client` | curl/Python usage snippets |
+| `GET` | `/api/sga/scan?install_path=` | List `.sga` archives (stub flag &lt;10 KB) |
+| `GET` | `/api/games` | Game variant profiles (CoH1/CoH2/DoW stubs) |
+| `POST` | `/api/patch/build` | Subset UCS download by id ranges |
+| `GET` | `/api/audit` | Recent operations log (no string content) |
+
+Optional env `UCS_API_KEY` enables `X-API-Key` header check on `/api/*`.
+Uploads older than 24 h are purged on startup.
+
+### ucs_analysis
+
+```python
+def diff_entries(a, b, filters) -> list[DiffRow]
+def token_linter(value) -> list[TokenIssue]
+def compare_tokens(a_val, b_val) -> Optional[TokenIssue]
+def script_detect(value) -> list[ScriptFinding]
+def fingerprint_file(path | bytes) -> FileFingerprint
+def subset_by_ranges(entries, ranges) -> dict[int, str]
+def fuzzy_search(query, entries, threshold) -> list[tuple[int, str, float]]
+```
+
 Error responses use a consistent JSON body (`ErrorResponse`); uploads over
 20 MB return `413`, unknown ids `404`, invalid regexes `400`.

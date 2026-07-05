@@ -52,28 +52,37 @@ async function boot() {
     new THREE.LineBasicMaterial({ color: OLIVE, transparent: true, opacity: 0.42 }),
   ));
 
-  // locale markers: rough lat/lon of localization hotspots
+  // locale markers with language codes — click navigates to language hub
   const locales = [
-    [52.5, 13.4],   // Berlin (de)
-    [48.9, 2.4],    // Paris (fr)
-    [51.5, -0.1],   // London (en-gb)
-    [55.8, 37.6],   // Moscow (ru)
-    [40.4, -3.7],   // Madrid (es)
-    [41.9, 12.5],   // Rome (it)
-    [52.2, 21.0],   // Warsaw (pl)
-    [39.9, 116.4],  // Beijing (zh)
-    [35.7, 139.7],  // Tokyo (ja)
-    [37.8, -122.4], // SF (en-us)
+    ["DE", 52.5, 13.4], ["FR", 48.9, 2.4], ["EN", 51.5, -0.1],
+    ["RU", 55.8, 37.6], ["ES", 40.4, -3.7], ["AR", 24.7, 46.7],
+    ["PL", 52.2, 21.0], ["CN", 39.9, 116.4], ["JP", 35.7, 139.7],
+    ["US", 37.8, -122.4],
   ];
-  const markerGeo = new THREE.SphereGeometry(0.035, 8, 8);
-  const markerMat = new THREE.MeshBasicMaterial({ color: AMBER });
-  for (const [lat, lon] of locales) {
+  const markerGeo = new THREE.SphereGeometry(0.04, 8, 8);
+  const raycaster = new THREE.Raycaster();
+  const pointer = new THREE.Vector2();
+  const markers = [];
+  for (const [code, lat, lon] of locales) {
     const phi = (90 - lat) * Math.PI / 180;
     const theta = (lon + 180) * Math.PI / 180;
-    const m = new THREE.Mesh(markerGeo, markerMat);
+    const m = new THREE.Mesh(markerGeo, new THREE.MeshBasicMaterial({ color: AMBER }));
     m.position.setFromSphericalCoords(1.52, phi, theta);
+    m.userData = { code };
     globe.add(m);
+    markers.push(m);
   }
+  canvas.style.cursor = "grab";
+  canvas.addEventListener("click", (ev) => {
+    const rect = canvas.getBoundingClientRect();
+    pointer.x = ((ev.clientX - rect.left) / rect.width) * 2 - 1;
+    pointer.y = -((ev.clientY - rect.top) / rect.height) * 2 + 1;
+    raycaster.setFromCamera(pointer, camera);
+    const hits = raycaster.intersectObjects(markers);
+    if (hits.length) {
+      window.dispatchEvent(new CustomEvent("coh-locale-click", { detail: hits[0].object.userData.code }));
+    }
+  });
 
   // --- radar ring + sweep ----------------------------------------------
   const radar = new THREE.Group();
