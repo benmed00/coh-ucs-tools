@@ -3,7 +3,8 @@
 # has no BOM and is not valid UTF-16-LE.
 chardet>=5.2.0
 
-# Web application / REST API (webapp/ package)
+# Web application / REST API (coh_ucs_tools.web)
+# Prefer: pip install -e ".[web]"
 fastapi==0.139.0
 uvicorn==0.50.0
 python-multipart==0.0.32   # multipart uploads

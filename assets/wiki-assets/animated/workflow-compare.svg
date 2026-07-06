@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 520 140" role="img" aria-label="Compare workflow animation">
+  <rect width="520" height="140" fill="#12140e" rx="8"/>
+  <text x="20" y="24" fill="#8a9a5b" font-family="monospace" font-size="11" letter-spacing="2">COMPARE WORKFLOW</text>
+  <!-- file A -->
+  <rect x="40" y="44" width="80" height="72" rx="4" fill="#1a3a2a" stroke="#3a4028"/>
+  <text x="80" y="72" text-anchor="middle" fill="#ffb648" font-family="monospace" font-size="9">RU</text>
+  <text x="80" y="90" text-anchor="middle" fill="#8f8c77" font-family="monospace" font-size="8">22,170</text>
+  <!-- file B -->
+  <rect x="140" y="44" width="80" height="72" rx="4" fill="#1a3a2a" stroke="#3a4028"/>
+  <text x="180" y="72" text-anchor="middle" fill="#ffb648" font-family="monospace" font-size="9">EN</text>
+  <text x="180" y="90" text-anchor="middle" fill="#8f8c77" font-family="monospace" font-size="8">8,578</text>
+  <!-- merge arrows -->
+  <path d="M230 80h40" stroke="#ffb648" stroke-width="2" marker-end="url(#arr)"/>
+  <defs><marker id="arr" markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6 Z" fill="#ffb648"/></marker></defs>
+  <!-- stats box -->
+  <rect x="290" y="40" width="200" height="80" rx="4" fill="#202417" stroke="#3a4028"/>
+  <text x="310" y="64" fill="#cdc294" font-family="monospace" font-size="9">coverage</text>
+  <rect x="310" y="72" width="160" height="10" rx="2" fill="#ffffff10"/>
+  <rect x="310" y="72" width="62" height="10" rx="2" fill="#ffb648">
+    <animate attributeName="width" values="20;62;62;20" dur="3s" repeatCount="indefinite"/>
+  </rect>
+  <text x="310" y="104" fill="#e06c4f" font-family="monospace" font-size="8">missing: 559200-559650</text>
+  <!-- scan line -->
+  <line x1="290" y1="40" x2="490" y2="40" stroke="#9acd68" stroke-width="1" opacity="0.6">
+    <animate attributeName="y1" values="40;120;40" dur="2.5s" repeatCount="indefinite"/>
+    <animate attributeName="y2" values="40;120;40" dur="2.5s" repeatCount="indefinite"/>
+  </line>
+</svg>

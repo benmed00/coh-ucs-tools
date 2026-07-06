@@ -11,7 +11,7 @@ services:
       REDIS_URL: ${REDIS_URL:-}
     volumes:
       - ucs-data:/data
-      - ./uploads:/data/uploads
+      - ./storage/uploads:/data/uploads
 
 volumes:
   ucs-data:

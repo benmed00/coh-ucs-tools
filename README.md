@@ -55,49 +55,54 @@ Uploads and merges on the public API require an **`X-API-Key`** in Settings when
 git clone <repo-url> coh-ucs-tools
 cd coh-ucs-tools
 
-# core toolkit needs nothing beyond the stdlib; this adds the optional
-# chardet fallback and the web app stack
-pip install -r requirements.txt
-
-# or install as a package (console entry point: coh-ucs)
-pip install .
+# install package with web stack (FastAPI, uvicorn, chardet)
+pip install -e ".[web]"
 
 # interactive menu (defaults to the two game paths baked into cli.py)
-python cli.py
+coh-ucs
 
 # or one-shot commands
-python cli.py compare --russian "C:\path\RelicCOH.Russian.ucs" --english "C:\path\RelicCOH.English.ucs"
+coh-ucs compare --russian "C:\path\RelicCOH.Russian.ucs" --english "C:\path\RelicCOH.English.ucs"
 
 # or the web app with Swagger docs at http://127.0.0.1:8000/docs
-python -m uvicorn webapp.main:app --reload
+python -m uvicorn coh_ucs_tools.web.main:app --reload
 ```
 
 ## Architecture
 
 ```mermaid
 flowchart TD
-    subgraph core ["Core (stdlib only)"]
-        parser["parser.py<br/>UcsDocument, parse/write,<br/>encoding & BOM detection"]
-        validator["validator.py<br/>duplicate/invalid/bad-char/<br/>empty/missing checks"]
-        stats["ucs_stats.py<br/>Comparison, coverage,<br/>range compression, report/"]
-        merge["merge.py<br/>placeholder & fill-from-source<br/>merge, safe writing"]
+    subgraph pkg ["src/coh_ucs_tools/"]
+        core["core/ parser, merge, validator"]
+        analysis["analysis/ stats, diff, patch_chain"]
+        locale["locale/ build, builders/"]
+        web["web/ FastAPI REST API + static SPA"]
     end
-    cli["cli.py<br/>interactive menu +<br/>argparse subcommands"]
-    translate["translate.py<br/>MT cross-check (QA only)"]
-    webapp["webapp/<br/>FastAPI REST API + frontend<br/>Swagger at /docs"]
-    tests["tests/<br/>29 unittest cases"]
+    cli["cli/ coh-ucs entry point"]
+    tests["tests/ pytest suite (202+ cases)"]
 
-    parser --> validator
-    parser --> stats
-    parser --> merge
-    cli --> parser & validator & stats & merge
-    translate --> parser & stats
-    webapp --> parser & validator & stats & merge
-    tests -.-> core
+    core --> analysis
+    cli --> core & analysis & locale
+    web --> core & analysis & locale
+    tests -.-> pkg
 ```
 
-The CLI, web app and MT cross-check all delegate to the same four core
-modules — no logic is duplicated.
+The CLI, web app and MT cross-check all delegate to the same core
+package — no logic is duplicated.
+
+## Modules
+
+| Package / path | Purpose |
+|----------------|---------|
+| `coh_ucs_tools.core` | Parser, merge, validator, shared text helpers |
+| `coh_ucs_tools.analysis` | Comparison stats, diff/lint, patch chains |
+| `coh_ucs_tools.locale` | Locale union builds and per-language builders |
+| `coh_ucs_tools.web` | FastAPI REST API + static SPA (see [Web application](#web-application)) |
+| `coh_ucs_tools.cli` | Interactive menu + `coh-ucs` argparse subcommands |
+| `tests/` | pytest suite organized as `unit/`, `web/`, `static/` |
+
+Full function-level documentation with signatures and examples:
+[`docs/api/reference.md`](docs/api/reference.md).
 
 ## UCS file structure (reverse engineered)
 
@@ -118,22 +123,6 @@ Findings verified byte-for-byte against the two shipped game files:
 Malformed lines (no tab, non-numeric key) are never silently dropped: the
 parser records them with line number and reason, and they surface in
 `report/invalid_lines.txt` and in validation.
-
-## Modules
-
-| File            | Purpose                                                            |
-|-----------------|--------------------------------------------------------------------|
-| `parser.py`     | Encoding/BOM detection, parsing into `UcsDocument`, UCS writer     |
-| `validator.py`  | Duplicate IDs, missing IDs, empty values, UTF-16/corruption checks |
-| `ucs_stats.py`  | Comparison, coverage stats, range compression, `report/` generator (was `statistics.py`) |
-| `merge.py`      | Merge algorithm and safe writing of the merged file                |
-| `translate.py`  | Machine translation (comparison/QA only) vs. recovered official text |
-| `cli.py`        | Interactive menu + argparse subcommands                            |
-| `webapp/`       | FastAPI REST API + static frontend (see [Web application](#web-application)) |
-| `tests/`        | `unittest` suite (parser, writer, validator, merge, sorting)       |
-
-Full function-level documentation with signatures and examples:
-[`docs/API.md`](docs/API.md).
 
 ### Parser
 
@@ -193,25 +182,25 @@ e.g. `[559200, 559201, …, 559650]` becomes `559200-559650`.
 
 ```powershell
 # interactive menu (defaults to the two game paths baked into cli.py)
-python cli.py
-python merge.py          # same menu
+coh-ucs
+# or: python -m coh_ucs_tools.cli
 
 # custom paths
-python cli.py --russian "C:\path\RelicCOH.Russian.ucs" --english "C:\path\RelicCOH.English.ucs"
+coh-ucs --russian "C:\path\RelicCOH.Russian.ucs" --english "C:\path\RelicCOH.English.ucs"
 
 # non-interactive subcommands
-python cli.py compare          # writes the report/ directory
-python cli.py statistics       # prints statistics.json content
-python cli.py export-missing   # missing IDs as ranges
-python cli.py merge            # writes RelicCOH.English.merged.ucs (cwd)
-python cli.py merge --fill-from-source   # fill gaps with verbatim source text
-                                         # instead of <MISSING> placeholders
-python cli.py validate
-python cli.py search-id 559200
-python cli.py search-text "Panzer"
-python cli.py search-text "Pz\.? ?IV" --regex
-python cli.py verify-checklist              # QA checklist on --english file
-python cli.py verify-checklist path.ucs     # QA checklist on any UCS
+coh-ucs compare          # writes storage/reports/
+coh-ucs statistics       # prints statistics.json content
+coh-ucs export-missing   # missing IDs as ranges
+coh-ucs merge            # writes RelicCOH.English.merged.ucs (cwd)
+coh-ucs merge --fill-from-source   # fill gaps with verbatim source text
+                                   # instead of <MISSING> placeholders
+coh-ucs validate
+coh-ucs search-id 559200
+coh-ucs search-text "Panzer"
+coh-ucs search-text "Pz\.? ?IV" --regex
+coh-ucs verify-checklist              # QA checklist on --english file
+coh-ucs verify-checklist path.ucs     # QA checklist on any UCS
 ```
 
 Interactive menu:
@@ -231,7 +220,7 @@ expression; otherwise a case-insensitive substring search is used.
 
 **Live UI (static frontend):** <https://benmed00.github.io/coh-ucs-tools/> — deployed
 from `master` via GitHub Actions (see [Hybrid deployment](#hybrid-deployment-phase-1)
-in [`docs/DEPLOY.md`](docs/DEPLOY.md)). First deploy requires enabling Pages in repo
+in [`docs/deployment/guide.md`](docs/deployment/guide.md)). First deploy requires enabling Pages in repo
 Settings → Pages → Source: **GitHub Actions**.
 
 **SEO / canonical URLs:** The GitHub Pages UI is the **canonical web frontend**
@@ -242,17 +231,17 @@ Routes use **path-based URLs** (`/upload`, `/compare`, …) with server fallback
 `/redoc`) lives on Fly.io and is listed in the Fly `sitemap.xml` only. Submit
 `https://benmed00.github.io/coh-ucs-tools/sitemap.xml` to Google Search Console
 for the UI; optionally add the Fly sitemap for API docs. Legacy `#/route` hash
-URLs redirect automatically to path URLs. See [`docs/DEPLOY.md`](docs/DEPLOY.md)
+URLs redirect automatically to path URLs. See [`docs/deployment/guide.md`](docs/deployment/guide.md)
 (SEO section) for Search Console setup and verification env vars.
 
-Deploy your own copy: [`docs/DEPLOY.md`](docs/DEPLOY.md).
+Deploy your own copy: [`docs/deployment/guide.md`](docs/deployment/guide.md).
 
-The `webapp/` package serves the toolkit as a REST API plus a static
+The `coh_ucs_tools.web` package serves the toolkit as a REST API plus a static
 single-page frontend. **Locally**, one process serves both (monolith):
 
 ```powershell
-pip install -r requirements.txt
-python -m uvicorn webapp.main:app --reload
+pip install -e ".[web]"
+python -m uvicorn coh_ucs_tools.web.main:app --reload
 ```
 
 Then open <http://127.0.0.1:8000> — dark WW2 command-console theme with
@@ -268,16 +257,16 @@ Three.js locale globe (click pins → Languages hub), Chart.js coverage donuts.
 
 * Interactive Swagger/OpenAPI: <http://127.0.0.1:8000/docs>
 * Built-in CoH1 UCS version registry (read-only copies at startup)
-* State: `uploads/` (gitignored) + `webapp/storage/` (glossary, bookmarks, audit, MT status)
+* State: `storage/uploads/` (gitignored) + SQLite at `storage/web/data/app.db`
 * Optional `UCS_API_KEY` env for API key middleware; 24 h upload cleanup on startup
 
 ### REST API surface
 
 Core endpoints plus extended analysis/localization/search — see
-[`docs/API.md`](docs/API.md) for the full table (diff, fingerprint, batch
+[`docs/api/reference.md`](docs/api/reference.md) for the full table (diff, fingerprint, batch
 compare, patch build, crossref, …).
 
-Endpoint reference: [`docs/API.md`](docs/API.md#rest-api). The API delegates
+Endpoint reference: [`docs/api/reference.md`](docs/api/reference.md#rest-api). The API delegates
 to the exact same core modules as the CLI.
 
 ## Recovered official English text
@@ -461,19 +450,15 @@ Coverage is computed against the union of both key sets.
 ## Tests
 
 ```powershell
-python -m unittest discover -s tests -v
+pip install -e ".[web]" pytest
+python -m pytest tests/ -v
 ```
 
-45 tests: 36 cover the core toolkit and locale builders — parsing (BOM, encodings, tabs in
-values, duplicates, invalid lines), writing (round-trip, overwrite
-protection), validation (all issue codes), range compression, comparison
-statistics, merge behaviour (placeholders only, numeric sorting,
-original-file protection), numeric key sorting, MT token preservation
-(`protect_tokens` / `restore_tokens`), verification checklist, locale builds,
-PO/TMX round-trip. 9 more
-(`tests/test_webapp.py`, FastAPI TestClient) cover the REST API happy path
-(upload → analyze → compare → merge → download) and its error cases. Extended
-webapp tests cover diff, verify, TMX, bookmarks, and more.
+202+ tests organized under `tests/unit/`, `tests/api/`, and `tests/static/`.
+Core tests cover parsing, validation, merge, locale builds, and analysis.
+Web tests (`tests/api/test_webapp.py`, FastAPI TestClient) cover the REST API
+happy path (upload → analyze → compare → merge → download) and extended
+endpoints (diff, verify, TMX, bookmarks, webhooks, and more).
 
 ## Documentation
 
@@ -481,7 +466,8 @@ webapp tests cover diff, verify, TMX, bookmarks, and more.
 |---|---|
 | **[GitHub Wiki](https://github.com/benmed00/coh-ucs-tools/wiki)** | UI walkthroughs with screenshots, step-by-step guides, and cross-links to the docs below |
 | [`docs/PROJECT_REPORT.md`](docs/PROJECT_REPORT.md) | Full project report: format reverse engineering, comparison findings, NSV recovery, MT cross-check, verification |
-| [`docs/API.md`](docs/API.md) | Python API (signatures + examples) and REST API endpoint reference |
+| [`docs/api/reference.md`](docs/api/reference.md) | Python API (signatures + examples) and REST API endpoint reference |
+| [`docs/architecture/STRUCTURE.md`](docs/architecture/STRUCTURE.md) | Repository layout and path conventions |
 | [`docs/BACKLOG.md`](docs/BACKLOG.md) | Prioritized roadmap (P1/P2/P3) |
 | [`CONTRIBUTING.md`](CONTRIBUTING.md) | Dev setup, tests, code style, adding game variants |
 | [`LICENSE`](LICENSE) | MIT |

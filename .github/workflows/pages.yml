@@ -23,14 +23,12 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Build static frontend
-        env:
-          PYTHONPATH: ${{ github.workspace }}
-        run: python scripts/build_static.py --api-base https://coh-ucs-tools.fly.dev --site-url https://benmed00.github.io/coh-ucs-tools --out dist
+        run: pip install -e . && python scripts/build/static.py --api-base https://coh-ucs-tools.fly.dev --site-url https://benmed00.github.io/coh-ucs-tools --out build/dist
 
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          path: dist
+          path: build/dist
 
   deploy:
     needs: build

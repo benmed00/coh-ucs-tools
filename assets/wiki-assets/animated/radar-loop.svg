@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" role="img" aria-label="Radar scan animation">
+  <rect width="200" height="200" fill="#12140e" rx="8"/>
+  <circle cx="100" cy="100" r="70" fill="none" stroke="#3a4028" stroke-width="1"/>
+  <circle cx="100" cy="100" r="48" fill="none" stroke="#3a4028" stroke-width="1"/>
+  <circle cx="100" cy="100" r="26" fill="none" stroke="#3a4028" stroke-width="1"/>
+  <line x1="100" y1="30" x2="100" y2="170" stroke="#3a4028" stroke-width="0.75"/>
+  <line x1="30" y1="100" x2="170" y2="100" stroke="#3a4028" stroke-width="0.75"/>
+  <g transform-origin="100 100">
+    <path d="M100 100 L100 32 A68 68 0 0 1 148 52 Z" fill="#9acd6830" stroke="#9acd68" stroke-width="1">
+      <animateTransform attributeName="transform" type="rotate" from="0 100 100" to="360 100 100" dur="4s" repeatCount="indefinite"/>
+    </path>
+  </g>
+  <circle cx="128" cy="78" r="4" fill="#ffb648">
+    <animate attributeName="opacity" values="0.3;1;0.3" dur="2s" repeatCount="indefinite"/>
+  </circle>
+  <circle cx="72" cy="118" r="3" fill="#ffb648">
+    <animate attributeName="opacity" values="1;0.3;1" dur="2.5s" repeatCount="indefinite"/>
+  </circle>
+  <text x="100" y="188" text-anchor="middle" fill="#8a9a5b" font-family="monospace" font-size="9" letter-spacing="2">UCS SCAN</text>
+</svg>

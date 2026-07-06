@@ -16,9 +16,8 @@ cd coh-ucs-tools
 python -m venv .venv
 .\.venv\Scripts\Activate.ps1
 
-# the CORE has no required dependencies; this installs the optional
-# chardet fallback and the web app stack
-pip install -r requirements.txt
+# install package with web extras (FastAPI, uvicorn, chardet)
+pip install -e ".[web]"
 
 # on Windows, make console output unicode-safe
 $env:PYTHONIOENCODING = "utf-8"
@@ -27,26 +26,21 @@ $env:PYTHONIOENCODING = "utf-8"
 ## Running the tests
 
 ```powershell
-python -m unittest discover -s tests -v
+pip install -e ".[web]" pytest coverage
+python -m pytest tests/ -v
 ```
 
-All tests must pass before you open a pull request. Tests are plain
-`unittest` — no pytest, no fixtures beyond `tempfile`. Add tests for every
-behaviour change; parser/writer changes need a round-trip test.
-
-If you touch the web app, also run its suite (when present):
-
-```powershell
-python -m unittest discover -s tests -p "test_webapp*" -v
-```
+All tests must pass before you open a pull request. The suite uses **pytest**
+(202+ cases). Add tests for every behaviour change; parser/writer changes need
+a round-trip test.
 
 ## Code style
 
-* **Stdlib-only core.** `parser.py`, `validator.py`, `statistics.py`,
-  `merge.py` and `cli.py` must not gain required third-party dependencies.
+* **Stdlib-only core.** `coh_ucs_tools.core.*`, `coh_ucs_tools.analysis.*`,
+  and `coh_ucs_tools.cli` must not gain required third-party dependencies.
   `chardet` stays optional (import inside a `try`/`except ImportError`).
-  Only `webapp/` and `translate.py` may use external packages, declared in
-  `requirements.txt`.
+  Only `coh_ucs_tools.web` and `coh_ucs_tools.tools.translate` may use
+  external packages, declared in `pyproject.toml` optional extras.
 * **Dataclasses + typing.** Public data structures are `@dataclass`es
   (frozen where value-like); all public functions carry full type hints and
   docstrings. `from __future__ import annotations` at the top of modules.
@@ -76,7 +70,7 @@ occasionally in conventions. To add one:
    `parse_text` with a strategy rather than forking the module.
 3. Add fixture-based tests with small hand-crafted samples for the new
    variant (never commit real game files — they are copyrighted).
-4. Update the version registry in `webapp/api.py` (`KNOWN_VERSIONS`) if the
+4. Update the version registry in `coh_ucs_tools.web.deps` (`KNOWN_VERSIONS`) if the
    variant should appear in the web app.
 
 ## Copyrighted content

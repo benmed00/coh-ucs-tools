@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 520 140" role="img" aria-label="Merge workflow animation">
+  <rect width="520" height="140" fill="#12140e" rx="8"/>
+  <text x="20" y="24" fill="#8a9a5b" font-family="monospace" font-size="11" letter-spacing="2">MERGE WORKFLOW</text>
+  <rect x="30" y="48" width="100" height="64" rx="4" fill="#1a3a2a" stroke="#ffb648" stroke-width="1.2"/>
+  <text x="80" y="76" text-anchor="middle" fill="#ffb648" font-family="monospace" font-size="9">target EN</text>
+  <text x="80" y="94" text-anchor="middle" fill="#8f8c77" font-family="monospace" font-size="8">preserved</text>
+  <rect x="150" y="48" width="100" height="64" rx="4" fill="#1a3a2a" stroke="#8a9a5b"/>
+  <text x="200" y="76" text-anchor="middle" fill="#cdc294" font-family="monospace" font-size="9">source RU</text>
+  <text x="200" y="94" text-anchor="middle" fill="#8f8c77" font-family="monospace" font-size="8">extra ids</text>
+  <g fill="#9acd68" font-family="monospace" font-size="8">
+    <text x="270" y="70">+ id</text>
+    <text x="270" y="88" fill="#e06c4f">&lt;MISSING&gt;</text>
+    <animate attributeName="opacity" values="0;1;1;0" dur="3s" repeatCount="indefinite"/>
+  </g>
+  <path d="M260 80h20M130 80h15M250 80h15" stroke="#3a4028" stroke-width="1.5"/>
+  <rect x="320" y="44" width="170" height="72" rx="4" fill="#9acd6810" stroke="#9acd68">
+    <animate attributeName="stroke-opacity" values="0.5;1;0.5" dur="2s" repeatCount="indefinite"/>
+  </rect>
+  <text x="405" y="72" text-anchor="middle" fill="#9acd68" font-family="monospace" font-size="9">merged.ucs</text>
+  <text x="405" y="90" text-anchor="middle" fill="#8f8c77" font-family="monospace" font-size="8">sorted · UTF-16-LE</text>
+</svg>

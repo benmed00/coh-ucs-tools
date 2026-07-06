@@ -41,39 +41,19 @@ dev = [
 ]
 
 [project.scripts]
-coh-ucs = "cli:main"
+coh-ucs = "coh_ucs_tools.cli:main"
 
 [project.urls]
 Homepage = "https://github.com/benmed00/coh-ucs-tools"
-Documentation = "https://github.com/benmed00/coh-ucs-tools/blob/master/docs/API.md"
+Documentation = "https://github.com/benmed00/coh-ucs-tools/blob/master/docs/api/reference.md"
 Repository = "https://github.com/benmed00/coh-ucs-tools"
 
 [tool.setuptools.packages.find]
-where = ["."]
-include = ["webapp*"]
+where = ["src"]
 
-[tool.setuptools]
-py-modules = [
-    "cli",
-    "parser",
-    "validator",
-    "ucs_stats",
-    "merge",
-    "translate",
-    "ucs_analysis",
-    "po_io",
-    "sga_reader",
-    "game_profiles",
-    "build_french",
-    "build_arabic",
-    "build_german",
-    "build_spanish",
-    "locale_build",
-    "verification_checklist",
-    "duplicate_probe",
-    "depot_downloader",
-    "build_italian",
-    "build_polish",
-    "locale_coverage",
-    "patch_chain",
-]
+[tool.pytest.ini_options]
+pythonpath = ["src", "."]
+testpaths = ["tests"]
+
+[tool.setuptools.package-data]
+"coh_ucs_tools.web" = ["static/**/*", "py.typed"]

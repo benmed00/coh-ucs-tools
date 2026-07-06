@@ -17,7 +17,7 @@ cd coh-ucs-desktop
 4. Add a sidecar or spawn script that runs:
 
 ```powershell
-python -m uvicorn webapp.main:app --host 127.0.0.1 --port 8000
+python -m uvicorn coh_ucs_tools.web.main:app --host 127.0.0.1 --port 8000
 ```
 
 5. `npm run tauri dev` for development; `npm run tauri build` for installers.

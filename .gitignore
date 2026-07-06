@@ -1,26 +1,50 @@
-# generated outputs
+# Generated build artifacts (see scripts/build/static.py)
+/build/
+
+# Runtime storage (uploads, downloads, reports, cache, web DB)
+storage/
+
+# Legacy runtime paths (migrate to storage/)
 report/
-dist/
-*.merged.ucs
 uploads/
+downloads/
+
+# Locale build outputs at repo root
+*.merged.ucs
 *.complete.ucs
 *.MT.ucs
 
-# downloaded / recovered game data (copyrighted text - never commit)
-downloads/
-uploads/
+# secrets / local-only
 mt_run.log
 fly-api-key.txt
-
-# webapp runtime storage
-webapp/storage/
-webapp/data/
 
 # python
 __pycache__/
 *.pyc
+.pytest_cache/
+.ruff_cache/
 .venv/
 *.egg-info/
+
+# e2e / CI screenshots
+e2e-dashboard.png
+dashboard.png
+storage/e2e/
+
+# legacy web runtime (migrated to storage/web/)
+webapp/storage/
+webapp/data/
+src/coh_ucs_tools/web/storage/
+src/coh_ucs_tools/web/data/
+
+# legacy dist folders at repo root
+dist/
 dist-verify/
 dist-check/
-.e2e-uploads/
+dist-test/
+dist_new/
+dist-verify-test/
+
+# editor
+.vscode/
+.idea/

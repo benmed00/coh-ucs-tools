@@ -3,8 +3,12 @@
 from __future__ import annotations
 
 import os
+from pathlib import Path
 
 import pytest
+
+REPO_ROOT = Path(__file__).resolve().parent.parent
+STATIC_DIR = REPO_ROOT / "src" / "coh_ucs_tools" / "web" / "static"
 
 _AUTH_ENV_KEYS = (
     "UCS_API_KEY",

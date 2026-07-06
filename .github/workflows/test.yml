@@ -21,12 +21,10 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
       - name: Install dependencies
-        run: pip install -r requirements.txt coverage ruff pytest
+        run: pip install -e ".[web]" coverage ruff pytest
       - name: Ruff lint (optional)
-        run: ruff check . --ignore E501 || true
+        run: ruff check src tests scripts --ignore E501 || true
       - name: Run tests with coverage
-        env:
-          PYTHONPATH: ${{ github.workspace }}
         run: coverage run -m pytest tests/ -q --tb=short
       - name: Coverage report
         run: coverage report -m
@@ -41,14 +39,14 @@ jobs:
           python-version: "3.12"
       - name: Install dependencies
         run: |
-          pip install -r requirements.txt
+          pip install -e ".[web]"
           pip install playwright
           playwright install chromium
       - name: E2E auth and API smoke
-        run: python scripts/e2e_playwright.py
+        run: python scripts/development/e2e_playwright.py
       - name: Screenshot dashboard
         run: |
-          python -m uvicorn webapp.main:app --host 127.0.0.1 --port 8000 &
+          python -m uvicorn coh_ucs_tools.web.main:app --host 127.0.0.1 --port 8000 &
           sleep 3
           python -c "
           from playwright.sync_api import sync_playwright
